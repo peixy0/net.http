@@ -1,46 +1,83 @@
 #include "app.hpp"
 #include <spdlog/spdlog.h>
-#include <filesystem>
+#include <utmp.h>
+#include <chrono>
+#include <ctime>
+#include <thread>
+#include <vector>
+#include "network.hpp"
 
 namespace application {
 
-AppLayer::AppLayer(const AppOptions& options) : options{options} {
+void AppBtmpContentLoader::Run() {
+  daemon = std::thread([this] {
+    while (true) {
+      LoadContent();
+    }
+  });
 }
 
-void AppLayer::Process(network::HttpRequest&& req, network::HttpSender& sender) {
-  std::string uri = req.uri;
-  if (uri.ends_with("/")) {
-    uri += "index.html";
+void AppBtmpContentLoader::LoadContent() {
+  std::vector<utmp> entries;
+  utmpname("/var/log/btmp");
+  setutent();
+  for (;;) {
+    auto ent = getutent();
+    if (not ent) {
+      break;
+    }
+    entries.emplace_back(*ent);
   }
-  if (uri.starts_with("/")) {
-    uri.erase(0, 1);
+  endutent();
+
+  std::string result;
+  int n = 0;
+  for (auto it = entries.rbegin(); it != entries.rend() and n < 50; it++) {
+    time_t t = it->ut_tv.tv_sec;
+    char timebuf[50];
+    std::strftime(timebuf, sizeof timebuf, "%c %Z", std::gmtime(&t));
+    result += timebuf;
+    result += " ";
+    result += it->ut_line;
+    result += " ";
+    result += it->ut_host;
+    result += "\t";
+    result += it->ut_user;
+    result += "\n";
+    n++;
   }
-  const auto path = std::filesystem::path{options.wwwRoot} / std::filesystem::path{uri};
-  const auto pathStr = path.string();
-  spdlog::debug("request local path is {}", pathStr);
-  if (not pathStr.starts_with(options.wwwRoot)) {
-    network::HttpResponse resp;
-    resp.status = network::HttpStatus::NotFound;
-    resp.headers.emplace("Content-Type", "text/plain");
-    resp.body = "No such file";
-    return sender.Send(std::move(resp));
+
+  {
+    std::unique_lock l{btmpMutex};
+    btmpContent = result;
   }
-  std::string mimeType = MimeTypeOf(pathStr);
-  network::FileHttpResponse resp;
-  resp.path = std::move(pathStr);
-  resp.headers.emplace("Content-type", std::move(mimeType));
+  {
+    using namespace std::literals::chrono_literals;
+    std::this_thread::sleep_for(10min);
+  }
+}
+
+std::string AppBtmpContentLoader::GetContent() const {
+  std::unique_lock l{btmpMutex};
+  return btmpContent;
+}
+
+AppLayer::AppLayer(AppBtmpContentLoader& btmpLoader) : btmpLoader{btmpLoader} {
+}
+
+void AppLayer::RequestLastbLog(network::HttpRequest&&, network::HttpSender& sender) {
+  network::HttpResponse resp;
+  resp.status = network::HttpStatus::OK;
+  resp.headers.emplace("Content-Type", "text/plain");
+  resp.body = btmpLoader.GetContent();
   return sender.Send(std::move(resp));
 }
 
-std::string AppLayer::MimeTypeOf(std::string_view path) const {
-  if (path.ends_with(".html")) {
-    return "text/html";
-  }
-  return "text/plain";
-}
-
-void AppLayer::Process(network::WebsocketFrame&& frame, network::WebsocketSender& sender) {
-  sender.Send(std::move(frame));
+void AppLayer::RequestNginxLog(network::HttpRequest&&, network::HttpSender& sender) {
+  network::FileHttpResponse resp;
+  resp.path = "/var/log/nginx/access.log";
+  resp.headers.emplace("Content-Type", "text/plain");
+  return sender.Send(std::move(resp));
 }
 
 }  // namespace application

@@ -1,23 +1,30 @@
 #pragma once
-#include <optional>
+#include <shared_mutex>
+#include <thread>
 #include "network.hpp"
 
 namespace application {
 
-struct AppOptions {
-  std::string wwwRoot;
+class AppBtmpContentLoader {
+public:
+  void Run();
+  void LoadContent();
+  std::string GetContent() const;
+
+private:
+  std::thread daemon;
+  std::string btmpContent;
+  mutable std::shared_mutex btmpMutex;
 };
 
 class AppLayer {
 public:
-  explicit AppLayer(const AppOptions&);
-  void Process(network::HttpRequest&&, network::HttpSender&);
-  void Process(network::WebsocketFrame&&, network::WebsocketSender&);
+  AppLayer(AppBtmpContentLoader&);
+  void RequestLastbLog(network::HttpRequest&&, network::HttpSender&);
+  void RequestNginxLog(network::HttpRequest&&, network::HttpSender&);
 
 private:
-  std::string MimeTypeOf(std::string_view) const;
-
-  const AppOptions options;
+  AppBtmpContentLoader& btmpLoader;
 };
 
 }  // namespace application
