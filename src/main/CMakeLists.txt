@@ -10,6 +10,7 @@ target_link_libraries(
   PRIVATE
   net.core
   spdlog
+  nlohmann_json
 )
 
 set_target_properties(

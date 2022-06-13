@@ -1,17 +1,24 @@
 #pragma once
+#include <shared_mutex>
+#include <thread>
 #include "network.hpp"
 
 namespace application {
 
 class AppLayer : public network::HttpProcessor {
 public:
-  explicit AppLayer(std::string_view);
+  AppLayer();
   ~AppLayer() = default;
   network::HttpResponse Process(const network::HttpRequest&) override;
 
 private:
-  std::string MimeTypeOf(std::string_view path);
-  std::string wwwRoot;
+  void StartBtmpLoaderDaemon();
+  void LoadBtmpContent();
+
+  std::atomic<bool> running = true;
+  std::thread daemon;
+  std::shared_mutex btmpMutex;
+  std::shared_ptr<std::string> btmpContent = std::make_shared<std::string>("");
 };
 
 }  // namespace application
