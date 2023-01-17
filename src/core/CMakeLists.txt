@@ -1,5 +1,5 @@
 add_library(
-  net.core
+  core
   file.cpp
   file.hpp
   http.cpp
@@ -12,13 +12,13 @@ add_library(
 )
 
 target_link_libraries(
-  net.core
+  core
   PRIVATE
   spdlog
 )
 
 target_include_directories(
-  net.core
+  core
   PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}
 )

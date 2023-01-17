@@ -1,6 +1,5 @@
 add_executable(
   all_tests
-  network_mocks.hpp
   network_tests.cpp
 )
 
@@ -16,7 +15,7 @@ target_link_libraries(
   gtest_main
   gmock
   spdlog
-  net.core
+  core
 )
 
 set_target_properties(

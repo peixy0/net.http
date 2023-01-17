@@ -1,19 +1,19 @@
 add_executable(
-  net
+  app
   main.cpp
   app.cpp
   app.hpp
 )
 
 target_link_libraries(
-  net
+  app
   PRIVATE
-  net.core
+  core
   spdlog
 )
 
 set_target_properties(
-  net
+  app
   PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY
   "${CMAKE_BINARY_DIR}"
