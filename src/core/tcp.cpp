@@ -9,6 +9,17 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+namespace {
+
+struct TrySendOperation {
+  auto operator()(auto& op) {
+    op.Send();
+    return op.Done();
+  }
+};
+
+}  // namespace
+
 namespace network {
 
 TcpSendBuffer::TcpSendBuffer(int peer, std::string_view buffer) : peer{peer}, buffer{buffer}, size{buffer.size()} {
@@ -82,8 +93,7 @@ void ConcreteTcpSender::SendBuffered() {
   std::lock_guard lock{senderMut};
   while (not buffered.empty()) {
     auto& op = buffered.front();
-    op->Send();
-    if (not op->Done()) {
+    if (not std::visit(TrySendOperation{}, op)) {
       return;
     }
     buffered.pop_front();
@@ -93,19 +103,21 @@ void ConcreteTcpSender::SendBuffered() {
 
 void ConcreteTcpSender::Send(std::string_view buf) {
   std::lock_guard lock{senderMut};
-  if (buffered.size() > maxBufferedSize) {
+  if (maxBufferedSize != 0 and buffered.size() >= maxBufferedSize) {
     return;
   }
-  buffered.emplace_back(std::make_unique<TcpSendBuffer>(peer, buf));
+  TcpSendBuffer op{peer, buf};
+  buffered.emplace_back(std::move(op));
   MarkPending();
 }
 
 void ConcreteTcpSender::Send(os::File file) {
   std::lock_guard lock{senderMut};
-  if (buffered.size() > maxBufferedSize) {
+  if (maxBufferedSize != 0 and buffered.size() >= maxBufferedSize) {
     return;
   }
-  buffered.emplace_back(std::make_unique<TcpSendFile>(peer, std::move(file)));
+  TcpSendFile op{peer, std::move(file)};
+  buffered.emplace_back(std::move(op));
   MarkPending();
 }
 
@@ -141,6 +153,8 @@ TcpConnectionContext::TcpConnectionContext(int fd, std::unique_ptr<TcpProcessor>
 
 TcpConnectionContext::~TcpConnectionContext() {
   spdlog::info("tcp connection closed: {}", fd);
+  receiver.reset();
+  sender.reset();
 }
 
 TcpProcessor& TcpConnectionContext::GetReceiver() {
@@ -253,7 +267,7 @@ void TcpLayer::StartLoop() {
 void TcpLayer::SetupPeer() {
   sockaddr_in peerAddr;
   socklen_t n = sizeof peerAddr;
-  bzero(&peerAddr, n);
+  memset(&peerAddr, 0, n);
   int s = accept(localDescriptor, reinterpret_cast<sockaddr*>(&peerAddr), &n);
   if (s < 0) {
     spdlog::error("tcp accept(): {}", strerror(errno));
@@ -315,33 +329,30 @@ Tcp4Layer::Tcp4Layer(std::string_view host, std::uint16_t port, const TcpOptions
 }
 
 int Tcp4Layer::CreateSocket() {
-  int flag = 1;
-  int r = -1;
+  const int one = 1;
+  int r = 0;
   int s = socket(AF_INET, SOCK_STREAM, 0);
   if (s < 0) {
     spdlog::error("tcp socket(): {}", strerror(errno));
     goto out;
   }
-  r = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof flag);
-  if (r < 0) {
-    spdlog::error("tcp setsockopt(): {}", strerror(errno));
+  if ((r = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one)) < 0) {
+    spdlog::error("tcp setsockopt(SO_REUSEADDR): {}", strerror(errno));
     goto out;
   }
   SetNonBlocking(s);
 
   sockaddr_in localAddr;
-  bzero(&localAddr, sizeof localAddr);
+  memset(&localAddr, 0, sizeof localAddr);
   localAddr.sin_family = AF_INET;
   localAddr.sin_addr.s_addr = inet_addr(host.c_str());
   localAddr.sin_port = htons(port);
-  r = bind(s, reinterpret_cast<sockaddr*>(&localAddr), sizeof localAddr);
-  if (r < 0) {
+  if ((r = bind(s, reinterpret_cast<sockaddr*>(&localAddr), sizeof localAddr)) < 0) {
     spdlog::error("tcp bind(): {}", strerror(errno));
     goto out;
   }
 
-  r = listen(s, 0);
-  if (r < 0) {
+  if ((r = listen(s, 0)) < 0) {
     spdlog::error("tcp listen(): {}", strerror(errno));
     goto out;
   }
