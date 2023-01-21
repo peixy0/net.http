@@ -21,8 +21,8 @@ private:
 
 class HttpLayer : public network::TcpProcessor {
 public:
-  HttpLayer(const HttpOptions&, std::unique_ptr<HttpParser>, std::unique_ptr<HttpSender>,
-            std::unique_ptr<HttpProcessor>);
+  HttpLayer(
+      const HttpOptions&, std::unique_ptr<HttpParser>, std::unique_ptr<HttpSender>, std::unique_ptr<HttpProcessor>);
   HttpLayer(const HttpLayer&) = delete;
   HttpLayer(HttpLayer&&) = delete;
   HttpLayer& operator=(const HttpLayer&) = delete;

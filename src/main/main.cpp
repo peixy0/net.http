@@ -1,5 +1,5 @@
 #include <spdlog/spdlog.h>
-#include <cstring>
+#include <thread>
 #include "app.hpp"
 #include "http.hpp"
 #include "network.hpp"
@@ -21,10 +21,17 @@ int main(int argc, char* argv[]) {
   httpOptions.maxPayloadSize = 1 << 20;
   network::HttpLayerFactory factory{httpOptions, appFactory};
 
-  network::TcpOptions tcpOptions;
-  tcpOptions.maxBufferedSize = 30;
-  network::Tcp4Layer tcp{host, port, tcpOptions, factory};
-  tcp.Start();
+  std::vector<std::thread> workers;
+  const int nWorkers = std::thread::hardware_concurrency();
+  for (int i = 0; i < nWorkers; i++) {
+    workers.emplace_back(std::thread([&host, &port, &factory] {
+      network::Tcp4Layer tcp{host, port, factory};
+      tcp.Start();
+    }));
+  }
+  for (auto& worker : workers) {
+    worker.join();
+  }
 
   return 0;
 }

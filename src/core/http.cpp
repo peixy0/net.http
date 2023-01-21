@@ -99,7 +99,7 @@ void ConcreteHttpSender::Close() {
 }
 
 HttpLayer::HttpLayer(const HttpOptions& options, std::unique_ptr<HttpParser> parser, std::unique_ptr<HttpSender> sender,
-                     std::unique_ptr<HttpProcessor> processor)
+    std::unique_ptr<HttpProcessor> processor)
     : options{options}, parser{std::move(parser)}, sender{std::move(sender)}, processor{std::move(processor)} {
 }
 
@@ -113,8 +113,8 @@ void HttpLayer::Process(std::string_view payload) {
   parser->Append(payload);
   size_t receivedPayloadSize = parser->GetLength();
   if (receivedPayloadSize > options.maxPayloadSize) {
-    spdlog::error("http receivedPayloadSize({}) > options.maxPayloadSize({})", receivedPayloadSize,
-                  options.maxPayloadSize);
+    spdlog::error(
+        "http receivedPayloadSize({}) > options.maxPayloadSize({})", receivedPayloadSize, options.maxPayloadSize);
     sender->Close();
     return;
   }
