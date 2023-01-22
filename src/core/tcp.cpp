@@ -139,26 +139,26 @@ void ConcreteTcpSender::UnmarkPending() {
 }
 
 TcpConnectionContext::TcpConnectionContext(
-    int fd, std::unique_ptr<TcpProcessor> receiver, std::unique_ptr<TcpSender> sender)
-    : fd{fd}, receiver{std::move(receiver)}, sender{std::move(sender)} {
+    int fd, std::unique_ptr<TcpProcessor> processor, std::unique_ptr<TcpSender> sender)
+    : fd{fd}, processor{std::move(processor)}, sender{std::move(sender)} {
   spdlog::info("tcp connection established: {}", fd);
 }
 
 TcpConnectionContext::~TcpConnectionContext() {
   spdlog::info("tcp connection closed: {}", fd);
-  receiver.reset();
+  processor.reset();
   sender.reset();
 }
 
-TcpProcessor& TcpConnectionContext::GetReceiver() {
-  return *receiver;
+TcpProcessor& TcpConnectionContext::GetProcessor() {
+  return *processor;
 }
 
 TcpSender& TcpConnectionContext::GetSender() {
   return *sender;
 }
 
-TcpLayer::TcpLayer(TcpProcessorFactory& receiverFactory) : receiverFactory{receiverFactory} {
+TcpLayer::TcpLayer(TcpProcessorFactory& processorFactory) : processorFactory{processorFactory} {
 }
 
 TcpLayer::~TcpLayer() {
@@ -269,8 +269,8 @@ void TcpLayer::SetupPeer() {
   MarkReceiverPending(s);
 
   auto sender = std::make_unique<ConcreteTcpSender>(s, *this);
-  auto receiver = receiverFactory.Create(*sender);
-  connections.try_emplace(s, s, std::move(receiver), std::move(sender));
+  auto processor = processorFactory.Create(*sender);
+  connections.try_emplace(s, s, std::move(processor), std::move(sender));
 }
 
 void TcpLayer::ClosePeer(int peerDescriptor) {
@@ -300,8 +300,8 @@ void TcpLayer::ReadFromPeer(int peerDescriptor) {
     return;
   }
   auto& context = std::get<TcpConnectionContext>(*it);
-  auto& receiver = context.GetReceiver();
-  receiver.Process({buf, buf + r});
+  auto& processor = context.GetProcessor();
+  processor.Process({buf, buf + r});
 }
 
 void TcpLayer::SendToPeer(int peerDescriptor) {
@@ -315,8 +315,8 @@ void TcpLayer::SendToPeer(int peerDescriptor) {
   context.GetSender().SendBuffered();
 }
 
-Tcp4Layer::Tcp4Layer(std::string_view host, std::uint16_t port, TcpProcessorFactory& receiverFactory)
-    : TcpLayer{receiverFactory}, host{host}, port{port} {
+Tcp4Layer::Tcp4Layer(std::string_view host, std::uint16_t port, TcpProcessorFactory& processorFactory)
+    : TcpLayer{processorFactory}, host{host}, port{port} {
 }
 
 int Tcp4Layer::CreateSocket() {

@@ -77,12 +77,12 @@ public:
   TcpConnectionContext& operator=(TcpConnectionContext&&) = delete;
   ~TcpConnectionContext();
 
-  TcpProcessor& GetReceiver();
+  TcpProcessor& GetProcessor();
   TcpSender& GetSender();
 
 private:
   int fd;
-  std::unique_ptr<TcpProcessor> receiver;
+  std::unique_ptr<TcpProcessor> processor;
   std::unique_ptr<TcpSender> sender;
 };
 
@@ -113,7 +113,7 @@ private:
   void PurgeExpiredConnections();
   int FindMostRecentTimeout() const;
 
-  TcpProcessorFactory& receiverFactory;
+  TcpProcessorFactory& processorFactory;
   int localDescriptor{-1};
   int epollDescriptor{-1};
   std::unordered_map<int, TcpConnectionContext> connections;

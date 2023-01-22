@@ -19,13 +19,13 @@ int main(int argc, char* argv[]) {
 
   network::HttpOptions httpOptions;
   httpOptions.maxPayloadSize = 1 << 20;
-  network::HttpLayerFactory factory{httpOptions, appFactory};
+  network::HttpLayerFactory httpLayerFactory{httpOptions, appFactory};
 
   std::vector<std::thread> workers;
   const int nWorkers = std::thread::hardware_concurrency();
   for (int i = 0; i < nWorkers; i++) {
-    workers.emplace_back(std::thread([&host, &port, &factory] {
-      network::Tcp4Layer tcp{host, port, factory};
+    workers.emplace_back(std::thread([&host, &port, &httpLayerFactory] {
+      network::Tcp4Layer tcp{host, port, httpLayerFactory};
       tcp.Start();
     }));
   }
