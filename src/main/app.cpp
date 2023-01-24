@@ -1,7 +1,6 @@
 #include "app.hpp"
 #include <spdlog/spdlog.h>
 #include "common.hpp"
-#include "network.hpp"
 #include "parser.hpp"
 #include "websocket.hpp"
 

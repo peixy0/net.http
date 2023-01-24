@@ -11,6 +11,7 @@ option(BUILD_STATIC "Build static flag" OFF)
 option(BUILD_TESTS "Build tests" ON)
 option(BUILD_WITH_ADDRESS_SANITIZER "Build with address sanitize flags" OFF)
 option(BUILD_WITH_MEMORY_SANITIZER "Build with memory sanitize flags" OFF)
+option(BUILD_WITH_CLANG_TIDY "Build with clang-tidy check" OFF)
 
 if (BUILD_STATIC)
   add_compile_options(-static)
@@ -29,6 +30,10 @@ if (BUILD_WITH_MEMORY_SANITIZER)
   set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
   add_compile_options(-fsanitize=memory -fno-omit-frame-pointer)
   add_link_options(-fsanitize=memory)
+endif()
+
+if (BUILD_WITH_CLANG_TIDY)
+  set(CMAKE_CXX_CLANG_TIDY "clang-tidy")
 endif()
 
 add_subdirectory(externals/spdlog)

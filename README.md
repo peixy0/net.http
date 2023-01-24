@@ -3,6 +3,7 @@ Simple async HTTP interface written in modern C++
 
 # build
 ```bash
+sudo apt install libssl-dev
 git clone https://github.com/peixy0/net.http
 cd net.http
 mkdir externals

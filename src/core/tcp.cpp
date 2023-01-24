@@ -85,7 +85,7 @@ ConcreteTcpSender::ConcreteTcpSender(int s, TcpSenderSupervisor& supervisor) : p
 }
 
 ConcreteTcpSender::~ConcreteTcpSender() {
-  Close();
+  ConcreteTcpSender::Close();
 }
 
 void ConcreteTcpSender::SendBuffered() {
@@ -321,13 +321,12 @@ Tcp4Layer::Tcp4Layer(std::string_view host, std::uint16_t port, TcpProcessorFact
 
 int Tcp4Layer::CreateSocket() {
   const int one = 1;
-  int r = 0;
   int s = socket(AF_INET, SOCK_STREAM, 0);
   if (s < 0) {
     spdlog::error("tcp socket(): {}", strerror(errno));
     goto out;
   }
-  if ((r = setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &one, sizeof one)) < 0) {
+  if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &one, sizeof one) < 0) {
     spdlog::error("tcp setsockopt(SO_REUSEADDR): {}", strerror(errno));
     goto out;
   }
@@ -338,12 +337,12 @@ int Tcp4Layer::CreateSocket() {
   localAddr.sin_family = AF_INET;
   localAddr.sin_addr.s_addr = inet_addr(host.c_str());
   localAddr.sin_port = htons(port);
-  if ((r = bind(s, reinterpret_cast<sockaddr*>(&localAddr), sizeof localAddr)) < 0) {
+  if (bind(s, reinterpret_cast<sockaddr*>(&localAddr), sizeof localAddr) < 0) {
     spdlog::error("tcp bind(): {}", strerror(errno));
     goto out;
   }
 
-  if ((r = listen(s, 8)) < 0) {
+  if (listen(s, 8) < 0) {
     spdlog::error("tcp listen(): {}", strerror(errno));
     goto out;
   }
