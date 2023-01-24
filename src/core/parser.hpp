@@ -52,6 +52,7 @@ private:
   HttpHeaders headers;
   bool headersParsed{false};
   bool headersEndingParsed{false};
+  bool upgraded{false};
   size_t bodyRemaining{0};
 };
 

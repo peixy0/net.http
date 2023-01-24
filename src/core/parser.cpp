@@ -1,14 +1,5 @@
 #include "parser.hpp"
-
-namespace {
-
-void ToLower(std::string& s) {
-  for (char& c : s) {
-    c = tolower(c);
-  }
-}
-
-}  // namespace
+#include "common.hpp"
 
 namespace network {
 
@@ -18,7 +9,7 @@ std::optional<HttpRequest> ConcreteHttpParser::Parse() {
     if (not method) {
       return std::nullopt;
     }
-    ToLower(*method);
+    common::ToLower(*method);
   }
   if (not uri) {
     uri = ParseToken(payload);
@@ -56,11 +47,22 @@ std::optional<HttpRequest> ConcreteHttpParser::Parse() {
   if (payload.length() < bodyRemaining) {
     return std::nullopt;
   }
+  if (upgraded) {
+    if (payload.empty()) {
+      return std::nullopt;
+    }
+    HttpRequest request{"", "", "", {}, {}, std::move(payload)};
+    payload.clear();
+    return request;
+  }
   std::string body = payload.substr(0, bodyRemaining);
   payload.erase(0, bodyRemaining);
+  upgraded = headers.contains("upgrade");
   HttpRequest request{std::move(*method), std::move(uriBase), std::move(*version), std::move(headers), std::move(query),
       std::move(body)};
-  Reset();
+  if (not upgraded) {
+    Reset();
+  }
   return request;
 }
 
@@ -82,6 +84,7 @@ void ConcreteHttpParser::Reset() {
   headers.clear();
   headersParsed = false;
   headersEndingParsed = false;
+  upgraded = false;
   bodyRemaining = 0;
 }
 
@@ -140,7 +143,7 @@ std::optional<HttpHeader> ConcreteHttpParser::ParseHeader(std::string& payload) 
   if (not field) {
     return std::nullopt;
   }
-  ToLower(*field);
+  common::ToLower(*field);
   return HttpHeader{std::move(*field), std::move(*line)};
 }
 

@@ -1,13 +1,65 @@
 #include "app.hpp"
 #include <spdlog/spdlog.h>
+#include "common.hpp"
+#include "network.hpp"
 
 namespace application {
+
+WebsocketLayer::WebsocketLayer(network::HttpSender& sender) : sender{sender} {
+}
+
+void WebsocketLayer::Process(network::HttpRequest&&) {
+}
 
 AppLayer::AppLayer(const AppOptions& options, network::HttpSender& sender) : options{options}, sender{sender} {
 }
 
 void AppLayer::Process(network::HttpRequest&& req) {
   spdlog::debug("app received request {} {} {}", req.method, req.uri, req.version);
+  if (websocketLayer) {
+    websocketLayer->Process(std::move(req));
+    return;
+  }
+  if (req.uri == "/ws") {
+    ServeWebsocket(req);
+    return;
+  }
+  ServeFile(req);
+}
+
+void AppLayer::ServeWebsocket(const network::HttpRequest& req) {
+  network::HttpResponse notFoundResp;
+  notFoundResp.status = network::HttpStatus::NotFound;
+  notFoundResp.headers.emplace("Content-Type", "text/plain");
+  notFoundResp.body = "Not Found";
+
+  auto upgradeIt = req.headers.find("upgrade");
+  if (upgradeIt == req.headers.end()) {
+    sender.Send(std::move(notFoundResp));
+    return;
+  }
+  auto upgrade = upgradeIt->second;
+  common::ToLower(upgrade);
+  if (upgrade != "websocket") {
+    sender.Send(std::move(notFoundResp));
+    return;
+  }
+  auto keyIt = req.headers.find("sec-websocket-key");
+  if (keyIt == req.headers.end()) {
+    sender.Send(std::move(notFoundResp));
+    return;
+  }
+  auto accept = common::Base64(common::SHA1(keyIt->second + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
+  network::HttpResponse resp;
+  resp.status = network::HttpStatus::SwitchingProtocols;
+  resp.headers.emplace("Upgrade", "websocket");
+  resp.headers.emplace("Connection", "Upgrade");
+  resp.headers.emplace("Sec-WebSocket-Accept", std::move(accept));
+  sender.Send(std::move(resp));
+  websocketLayer = std::make_unique<WebsocketLayer>(sender);
+}
+
+void AppLayer::ServeFile(const network::HttpRequest& req) {
   std::string uri = req.uri;
   if (uri.ends_with("/")) {
     uri += "index.html";
@@ -20,7 +72,7 @@ void AppLayer::Process(network::HttpRequest&& req) {
   std::string localPath{localPathStr};
   spdlog::debug("request local path is {}", localPath);
   if (not localPath.starts_with(options.wwwRoot)) {
-    network::PreparedHttpResponse resp;
+    network::HttpResponse resp;
     resp.status = network::HttpStatus::NotFound;
     resp.headers.emplace("Content-Type", "text/plain");
     resp.body = "Not Found";

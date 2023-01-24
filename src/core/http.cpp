@@ -9,6 +9,8 @@ namespace {
 
 std::string to_string(network::HttpStatus status) {
   switch (status) {
+    case network::HttpStatus::SwitchingProtocols:
+      return "101 Switching Protocols";
     case network::HttpStatus::OK:
       return "200 OK";
     case network::HttpStatus::BadRequest:
@@ -26,7 +28,7 @@ namespace network {
 ConcreteHttpSender::ConcreteHttpSender(TcpSender& sender) : sender{sender} {
 }
 
-void ConcreteHttpSender::Send(PreparedHttpResponse&& response) {
+void ConcreteHttpSender::Send(HttpResponse&& response) {
   std::string respPayload = "HTTP/1.1 " + to_string(response.status) + "\r\n";
   response.headers.emplace("Content-Length", std::to_string(response.body.length()));
   for (const auto& [k, v] : response.headers) {
@@ -37,11 +39,15 @@ void ConcreteHttpSender::Send(PreparedHttpResponse&& response) {
   sender.Send(std::move(respPayload));
 }
 
+void ConcreteHttpSender::Send(RawHttpResponse&& response) {
+  sender.Send(std::move(response.body));
+}
+
 void ConcreteHttpSender::Send(FileHttpResponse&& response) {
   os::File file{response.path};
   if (not file.Ok()) {
     spdlog::error("http open(\"{}\"): {}", response.path, strerror(errno));
-    PreparedHttpResponse resp;
+    HttpResponse resp;
     resp.status = HttpStatus::NotFound;
     resp.headers.emplace("Content-Type", "text/plain");
     resp.body = "Not Found";
@@ -119,11 +125,13 @@ void HttpLayer::Process(std::string_view payload) {
     return;
   }
   spdlog::debug("http received payload: {}", payload);
-  auto request = parser->Parse();
-  if (not request) {
-    return;
+  while (true) {
+    auto request = parser->Parse();
+    if (not request) {
+      break;
+    }
+    processor->Process(std::move(*request));
   }
-  processor->Process(std::move(*request));
 }
 
 HttpLayerFactory::HttpLayerFactory(const HttpOptions& options, HttpProcessorFactory& processorFactory)

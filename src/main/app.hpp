@@ -3,6 +3,15 @@
 
 namespace application {
 
+class WebsocketLayer {
+public:
+  explicit WebsocketLayer(network::HttpSender&);
+  void Process(network::HttpRequest&&);
+
+private:
+  network::HttpSender& sender;
+};
+
 struct AppOptions {
   std::string wwwRoot;
 };
@@ -14,10 +23,13 @@ public:
   void Process(network::HttpRequest&&) override;
 
 private:
-  std::string MimeTypeOf(std::string_view path);
+  void ServeWebsocket(const network::HttpRequest&);
+  void ServeFile(const network::HttpRequest&);
+  std::string MimeTypeOf(std::string_view);
 
   AppOptions options;
   network::HttpSender& sender;
+  std::unique_ptr<WebsocketLayer> websocketLayer{nullptr};
 };
 
 class AppLayerFactory : public network::HttpProcessorFactory {

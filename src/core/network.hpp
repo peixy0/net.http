@@ -58,11 +58,15 @@ struct HttpRequest {
   std::string body;
 };
 
-enum class HttpStatus { OK, BadRequest, NotFound };
+enum class HttpStatus { SwitchingProtocols, OK, BadRequest, NotFound };
 
-struct PreparedHttpResponse {
+struct HttpResponse {
   HttpStatus status;
   HttpHeaders headers;
+  std::string body;
+};
+
+struct RawHttpResponse {
   std::string body;
 };
 
@@ -89,7 +93,8 @@ struct ChunkedDataHttpResponse {
 class HttpSender {
 public:
   virtual ~HttpSender() = default;
-  virtual void Send(PreparedHttpResponse&&) = 0;
+  virtual void Send(HttpResponse&&) = 0;
+  virtual void Send(RawHttpResponse&&) = 0;
   virtual void Send(FileHttpResponse&&) = 0;
   virtual void Send(MixedReplaceHeaderHttpResponse&&) = 0;
   virtual void Send(MixedReplaceDataHttpResponse&&) = 0;

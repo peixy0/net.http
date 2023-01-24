@@ -7,7 +7,8 @@ namespace network {
 class ConcreteHttpSender : public HttpSender {
 public:
   ConcreteHttpSender(TcpSender&);
-  void Send(PreparedHttpResponse&&) override;
+  void Send(HttpResponse&&) override;
+  void Send(RawHttpResponse&&) override;
   void Send(FileHttpResponse&&) override;
   void Send(MixedReplaceHeaderHttpResponse&&) override;
   void Send(MixedReplaceDataHttpResponse&&) override;
