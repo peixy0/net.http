@@ -28,7 +28,7 @@ public:
   HttpLayer(HttpLayer&&) = delete;
   HttpLayer& operator=(const HttpLayer&) = delete;
   HttpLayer& operator=(HttpLayer&&) = delete;
-  ~HttpLayer();
+  ~HttpLayer() override;
   void Process(std::string_view) override;
 
 private:
@@ -45,7 +45,7 @@ public:
   HttpLayerFactory(HttpLayerFactory&&) = delete;
   HttpLayerFactory& operator=(const HttpLayerFactory&) = delete;
   HttpLayerFactory& operator=(HttpLayerFactory&&) = delete;
-  ~HttpLayerFactory() = default;
+  ~HttpLayerFactory() override = default;
   std::unique_ptr<network::TcpProcessor> Create(TcpSender&) const override;
 
 private:

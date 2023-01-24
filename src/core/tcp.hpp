@@ -93,7 +93,7 @@ public:
   TcpLayer(TcpLayer&&) = delete;
   TcpLayer& operator=(const TcpLayer&) = delete;
   TcpLayer& operator=(TcpLayer&&) = delete;
-  virtual ~TcpLayer();
+  virtual ~TcpLayer() override;
 
   void Start();
   void MarkSenderPending(int) override;

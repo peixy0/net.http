@@ -90,6 +90,14 @@ struct ChunkedDataHttpResponse {
   std::string body;
 };
 
+class HttpParser {
+public:
+  virtual ~HttpParser() = default;
+  virtual std::optional<HttpRequest> Parse() = 0;
+  virtual void Append(std::string_view) = 0;
+  virtual size_t GetLength() const = 0;
+};
+
 class HttpSender {
 public:
   virtual ~HttpSender() = default;
@@ -113,6 +121,26 @@ class HttpProcessorFactory {
 public:
   virtual ~HttpProcessorFactory() = default;
   virtual std::unique_ptr<HttpProcessor> Create(HttpSender&) const = 0;
+};
+
+struct WebsocketFrame {
+  bool fin;
+  std::uint8_t opcode;
+  std::string payload;
+};
+
+class WebsocketFrameParser {
+public:
+  virtual ~WebsocketFrameParser() = default;
+  virtual std::optional<WebsocketFrame> Parse() = 0;
+  virtual void Append(std::string_view) = 0;
+};
+
+class WebsocketSender {
+public:
+  virtual ~WebsocketSender() = default;
+  virtual void Send(WebsocketFrame&&) = 0;
+  virtual void Close() = 0;
 };
 
 }  // namespace network

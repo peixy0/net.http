@@ -219,4 +219,63 @@ HttpQuery ConcreteHttpParser::ParseQueryString(std::string& uri) const {
   return result;
 }
 
+void ConcreteWebsocketFrameParser::Append(std::string_view buffer) {
+  payload += buffer;
+}
+
+std::optional<WebsocketFrame> ConcreteWebsocketFrameParser::Parse() {
+  int payloadLen = payload.length();
+  int requiredLen = headerLen;
+  if (payloadLen < requiredLen) {
+    return std::nullopt;
+  }
+  WebsocketFrame frame;
+  const auto* p = reinterpret_cast<const unsigned char*>(payload.data());
+  frame.fin = (p[0] >> 7) & 0b1;
+  frame.opcode = p[0] & 0b1111;
+  bool mask = (p[1] >> 7) & 0b1;
+  std::uint64_t len = p[1] & 0b1111111;
+  p += headerLen;
+  int payloadExtLen = 0;
+  if (len == 126) {
+    payloadExtLen = ext1Len;
+  }
+  if (len == 127) {
+    payloadExtLen = ext2Len;
+  }
+  requiredLen += payloadExtLen;
+  if (payloadLen < requiredLen) {
+    return std::nullopt;
+  }
+  if (payloadExtLen > 0) {
+    len = 0;
+    for (int i = 0; i < payloadExtLen; i++) {
+      len |= p[i] << (8 * (payloadExtLen - i - 1));
+    }
+    p += payloadExtLen;
+  }
+  unsigned char maskKey[maskLen] = {0};
+  if (mask) {
+    requiredLen += maskLen;
+    if (payloadLen < requiredLen) {
+      return std::nullopt;
+    }
+    for (int i = 0; i < maskLen; i++) {
+      maskKey[i] = p[i];
+    }
+    p += maskLen;
+  }
+  requiredLen += len;
+  if (payloadLen < requiredLen) {
+    return std::nullopt;
+  }
+  std::string data{p, p + len};
+  for (std::uint64_t i = 0; i < len; i++) {
+    data[i] ^= reinterpret_cast<const std::uint8_t*>(&maskKey)[i % maskLen];
+  }
+  frame.payload = std::move(data);
+  payload.erase(0, requiredLen);
+  return frame;
+}
+
 }  // namespace network

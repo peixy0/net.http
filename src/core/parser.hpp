@@ -5,14 +5,6 @@
 
 namespace network {
 
-class HttpParser {
-public:
-  virtual ~HttpParser() = default;
-  virtual std::optional<HttpRequest> Parse() = 0;
-  virtual void Append(std::string_view) = 0;
-  virtual size_t GetLength() const = 0;
-};
-
 class ConcreteHttpParser : public HttpParser {
 public:
   ConcreteHttpParser() = default;
@@ -20,7 +12,7 @@ public:
   ConcreteHttpParser(ConcreteHttpParser&&) = delete;
   ConcreteHttpParser& operator=(const ConcreteHttpParser&) = delete;
   ConcreteHttpParser& operator=(ConcreteHttpParser&&) = delete;
-  ~ConcreteHttpParser() = default;
+  ~ConcreteHttpParser() override = default;
 
   std::optional<HttpRequest> Parse() override;
   void Append(std::string_view) override;
@@ -54,6 +46,26 @@ private:
   bool headersEndingParsed{false};
   bool upgraded{false};
   size_t bodyRemaining{0};
+};
+
+class ConcreteWebsocketFrameParser : public WebsocketFrameParser {
+public:
+  ConcreteWebsocketFrameParser() = default;
+  ConcreteWebsocketFrameParser(const ConcreteWebsocketFrameParser&) = delete;
+  ConcreteWebsocketFrameParser(ConcreteWebsocketFrameParser&&) = delete;
+  ConcreteWebsocketFrameParser& operator=(const ConcreteWebsocketFrameParser&) = delete;
+  ConcreteWebsocketFrameParser& operator=(ConcreteWebsocketFrameParser&&) = delete;
+  ~ConcreteWebsocketFrameParser() override = default;
+
+  std::optional<WebsocketFrame> Parse() override;
+  void Append(std::string_view) override;
+
+private:
+  std::string payload;
+  static constexpr std::uint8_t headerLen = 2;
+  static constexpr std::uint8_t maskLen = 4;
+  static constexpr std::uint8_t ext1Len = 2;
+  static constexpr std::uint8_t ext2Len = 8;
 };
 
 }  // namespace network

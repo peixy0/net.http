@@ -11,6 +11,8 @@ add_library(
   parser.hpp
   tcp.cpp
   tcp.hpp
+  websocket.cpp
+  websocket.hpp
 )
 
 target_link_libraries(
