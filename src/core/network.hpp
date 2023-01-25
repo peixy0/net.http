@@ -152,11 +152,23 @@ public:
   virtual std::optional<WebsocketFrame> Parse(std::string&) const = 0;
 };
 
-class WebsocketSender {
+class WebsocketFrameSender {
 public:
-  virtual ~WebsocketSender() = default;
+  virtual ~WebsocketFrameSender() = default;
   virtual void Send(WebsocketFrame&&) = 0;
   virtual void Close() = 0;
+};
+
+class WebsocketProcessor {
+public:
+  virtual ~WebsocketProcessor() = default;
+  virtual void Process(WebsocketFrame&&) = 0;
+};
+
+class WebsocketProcessorFactory {
+public:
+  virtual ~WebsocketProcessorFactory() = default;
+  virtual std::unique_ptr<WebsocketProcessor> Create(WebsocketFrameSender&) const = 0;
 };
 
 }  // namespace network

@@ -5,7 +5,7 @@
 
 namespace network {
 
-class ConcreteWebsocketSender : public WebsocketSender {
+class ConcreteWebsocketSender : public WebsocketFrameSender {
 public:
   explicit ConcreteWebsocketSender(TcpSender&);
   ConcreteWebsocketSender(const ConcreteWebsocketSender&) = delete;
@@ -32,26 +32,37 @@ private:
 
 class WebsocketLayer : public ProtocolProcessor {
 public:
-  WebsocketLayer(std::unique_ptr<network::WebsocketFrameParser>, std::unique_ptr<network::WebsocketSender>);
+  WebsocketLayer(std::unique_ptr<network::WebsocketFrameParser>, std::unique_ptr<network::WebsocketFrameSender>,
+      WebsocketProcessorFactory&);
+  WebsocketLayer(const WebsocketLayer&) = delete;
+  WebsocketLayer(WebsocketLayer&&) = delete;
+  WebsocketLayer& operator=(const WebsocketLayer&) = delete;
+  WebsocketLayer& operator=(WebsocketLayer&&) = delete;
+  ~WebsocketLayer() override;
+
   void Process(std::string&) override;
 
 private:
   static constexpr std::uint8_t opClose = 8;
 
   std::unique_ptr<network::WebsocketFrameParser> parser;
-  std::unique_ptr<network::WebsocketSender> sender;
+  std::unique_ptr<network::WebsocketFrameSender> sender;
+  std::unique_ptr<WebsocketProcessor> processor;
   std::string message;
 };
 
 class ConcreteWebsocketLayerFactory : public WebsocketLayerFactory {
 public:
-  ConcreteWebsocketLayerFactory() = default;
+  explicit ConcreteWebsocketLayerFactory(std::unique_ptr<WebsocketProcessorFactory>);
   ConcreteWebsocketLayerFactory(const ConcreteWebsocketLayerFactory&) = delete;
   ConcreteWebsocketLayerFactory(ConcreteWebsocketLayerFactory&&) = delete;
   ConcreteWebsocketLayerFactory& operator=(const ConcreteWebsocketLayerFactory&) = delete;
   ConcreteWebsocketLayerFactory& operator=(ConcreteWebsocketLayerFactory&&) = delete;
   ~ConcreteWebsocketLayerFactory() override = default;
   std::unique_ptr<ProtocolProcessor> Create(TcpSender&) const override;
+
+private:
+  std::unique_ptr<WebsocketProcessorFactory> processorFactory;
 };
 
 }  // namespace network

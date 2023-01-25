@@ -22,10 +22,12 @@ int main(int argc, char* argv[]) {
   const int nWorkers = std::thread::hardware_concurrency();
   for (int i = 0; i < nWorkers; i++) {
     workers.emplace_back(std::thread([&host, &port, &appOptions] {
-      auto appFactory = std::make_unique<application::AppLayerFactory>(appOptions);
-      auto httpLayerFactory = std::make_unique<network::ConcreteHttpLayerFactory>(std::move(appFactory));
+      auto appHttpProcessorFactory = std::make_unique<application::AppHttpProcessorFactory>(appOptions);
+      auto httpLayerFactory = std::make_unique<network::ConcreteHttpLayerFactory>(std::move(appHttpProcessorFactory));
       auto protocolLayerFactory = std::make_unique<network::ProtocolLayerFactory>(std::move(httpLayerFactory));
-      auto websocketLayerFactory = std::make_unique<network::ConcreteWebsocketLayerFactory>();
+      auto appWebsocketProcessorFactory = std::make_unique<application::AppWebsocketProcessorFactory>();
+      auto websocketLayerFactory =
+          std::make_unique<network::ConcreteWebsocketLayerFactory>(std::move(appWebsocketProcessorFactory));
       protocolLayerFactory->Add(std::move(websocketLayerFactory));
       network::Tcp4Layer tcp{host, port, std::move(protocolLayerFactory)};
       tcp.Start();

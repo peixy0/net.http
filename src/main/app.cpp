@@ -1,16 +1,15 @@
 #include "app.hpp"
 #include <spdlog/spdlog.h>
-#include "parser.hpp"
 #include "websocket.hpp"
 
 namespace application {
 
-AppLayer::AppLayer(const AppOptions& options, network::HttpSender& sender, network::ProtocolUpgrader& upgrader)
+AppHttpProcessor::AppHttpProcessor(
+    const AppOptions& options, network::HttpSender& sender, network::ProtocolUpgrader& upgrader)
     : options{options}, sender{sender}, upgrader{upgrader} {
 }
 
-void AppLayer::Process(network::HttpRequest&& req) {
-  spdlog::debug("app received request {} {} {}", req.method, req.uri, req.version);
+void AppHttpProcessor::Process(network::HttpRequest&& req) {
   if (req.uri == "/ws") {
     ServeWebsocket(req);
     return;
@@ -18,7 +17,7 @@ void AppLayer::Process(network::HttpRequest&& req) {
   ServeFile(req);
 }
 
-void AppLayer::ServeWebsocket(const network::HttpRequest& req) {
+void AppHttpProcessor::ServeWebsocket(const network::HttpRequest& req) {
   network::WebsocketHandshakeBuilder handshakeBuilder{req};
   auto resp = handshakeBuilder.Build();
   if (not resp) {
@@ -33,7 +32,7 @@ void AppLayer::ServeWebsocket(const network::HttpRequest& req) {
   upgrader.UpgradeToWebsocket();
 }
 
-void AppLayer::ServeFile(const network::HttpRequest& req) {
+void AppHttpProcessor::ServeFile(const network::HttpRequest& req) {
   std::string uri = req.uri;
   if (uri.ends_with("/")) {
     uri += "index.html";
@@ -59,14 +58,14 @@ void AppLayer::ServeFile(const network::HttpRequest& req) {
   return sender.Send(std::move(resp));
 }
 
-std::string AppLayer::MimeTypeOf(std::string_view path) {
+std::string AppHttpProcessor::MimeTypeOf(std::string_view path) {
   if (path.ends_with(".html")) {
     return "text/html";
   }
   return "text/plain";
 }
 
-AppLayerFactory::AppLayerFactory(const AppOptions& options_) : options{options_} {
+AppHttpProcessorFactory::AppHttpProcessorFactory(const AppOptions& options_) : options{options_} {
   const std::string s{options.wwwRoot};
   char resolvedPath[PATH_MAX];
   realpath(s.c_str(), resolvedPath);
@@ -74,9 +73,21 @@ AppLayerFactory::AppLayerFactory(const AppOptions& options_) : options{options_}
   options.wwwRoot = resolvedPath;
 }
 
-std::unique_ptr<network::HttpProcessor> AppLayerFactory::Create(
+std::unique_ptr<network::HttpProcessor> AppHttpProcessorFactory::Create(
     network::HttpSender& sender, network::ProtocolUpgrader& upgrader) const {
-  return std::make_unique<AppLayer>(options, sender, upgrader);
+  return std::make_unique<AppHttpProcessor>(options, sender, upgrader);
+}
+
+AppWebsocketProcessor::AppWebsocketProcessor(network::WebsocketFrameSender& sender) : sender{sender} {
+}
+
+void AppWebsocketProcessor::Process(network::WebsocketFrame&& frame) {
+  sender.Send(std::move(frame));
+}
+
+std::unique_ptr<network::WebsocketProcessor> AppWebsocketProcessorFactory::Create(
+    network::WebsocketFrameSender& sender) const {
+  return std::make_unique<AppWebsocketProcessor>(sender);
 }
 
 }  // namespace application

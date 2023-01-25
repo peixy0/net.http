@@ -58,9 +58,15 @@ std::optional<HttpResponse> WebsocketHandshakeBuilder::Build() const {
   return resp;
 }
 
-WebsocketLayer::WebsocketLayer(
-    std::unique_ptr<network::WebsocketFrameParser> parser, std::unique_ptr<network::WebsocketSender> sender)
-    : parser{std::move(parser)}, sender{std::move(sender)} {
+WebsocketLayer::WebsocketLayer(std::unique_ptr<network::WebsocketFrameParser> parser,
+    std::unique_ptr<network::WebsocketFrameSender> sender_, WebsocketProcessorFactory& processorFactory)
+    : parser{std::move(parser)}, sender{std::move(sender_)}, processor{processorFactory.Create(*sender)} {
+}
+
+WebsocketLayer::~WebsocketLayer() {
+  processor.reset();
+  parser.reset();
+  sender.reset();
 }
 
 void WebsocketLayer::Process(std::string& payload) {
@@ -68,19 +74,24 @@ void WebsocketLayer::Process(std::string& payload) {
   if (not frame) {
     return;
   }
-  spdlog::debug("app received websocket frame: fin = {}, opcode = {}", frame->fin, frame->opcode);
+  spdlog::debug("websocket received frame: fin = {}, opcode = {}", frame->fin, frame->opcode);
+  spdlog::debug("websocket received message: {}", frame->payload);
   if (frame->opcode == opClose) {
     sender->Close();
     return;
   }
-  spdlog::debug("app received websocket message: {}", frame->payload);
-  sender->Send(std::move(*frame));
+  processor->Process(std::move(*frame));
+}
+
+ConcreteWebsocketLayerFactory::ConcreteWebsocketLayerFactory(
+    std::unique_ptr<WebsocketProcessorFactory> processorFactory)
+    : processorFactory{std::move(processorFactory)} {
 }
 
 std::unique_ptr<ProtocolProcessor> ConcreteWebsocketLayerFactory::Create(TcpSender& tcpSender) const {
   auto parser = std::make_unique<ConcreteWebsocketFrameParser>();
   auto sender = std::make_unique<ConcreteWebsocketSender>(tcpSender);
-  return std::make_unique<WebsocketLayer>(std::move(parser), std::move(sender));
+  return std::make_unique<WebsocketLayer>(std::move(parser), std::move(sender), *processorFactory);
 }
 
 }  // namespace network

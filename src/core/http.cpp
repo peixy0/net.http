@@ -3,7 +3,6 @@
 #include <cctype>
 #include <sstream>
 #include "file.hpp"
-#include "network.hpp"
 
 namespace {
 
@@ -112,11 +111,11 @@ HttpLayer::~HttpLayer() {
 }
 
 void HttpLayer::Process(std::string& payload) {
-  spdlog::debug("http received payload: {}", payload);
   auto request = parser->Parse(payload);
   if (not request) {
     return;
   }
+  spdlog::debug("http received request: method = {}, uri = {}", request->method, request->uri);
   processor->Process(std::move(*request));
 }
 

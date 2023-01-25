@@ -8,10 +8,9 @@ struct AppOptions {
   std::string wwwRoot;
 };
 
-class AppLayer : public network::HttpProcessor {
+class AppHttpProcessor : public network::HttpProcessor {
 public:
-  AppLayer(const AppOptions&, network::HttpSender&, network::ProtocolUpgrader&);
-  ~AppLayer() override = default;
+  AppHttpProcessor(const AppOptions&, network::HttpSender&, network::ProtocolUpgrader&);
   void Process(network::HttpRequest&&) override;
 
 private:
@@ -24,13 +23,28 @@ private:
   network::ProtocolUpgrader& upgrader;
 };
 
-class AppLayerFactory : public network::HttpProcessorFactory {
+class AppHttpProcessorFactory : public network::HttpProcessorFactory {
 public:
-  AppLayerFactory(const AppOptions&);
+  AppHttpProcessorFactory(const AppOptions&);
   std::unique_ptr<network::HttpProcessor> Create(network::HttpSender&, network::ProtocolUpgrader&) const override;
 
 private:
   AppOptions options;
+};
+
+class AppWebsocketProcessor : public network::WebsocketProcessor {
+public:
+  explicit AppWebsocketProcessor(network::WebsocketFrameSender&);
+  void Process(network::WebsocketFrame&&) override;
+
+private:
+  network::WebsocketFrameSender& sender;
+};
+
+class AppWebsocketProcessorFactory : public network::WebsocketProcessorFactory {
+public:
+  AppWebsocketProcessorFactory() = default;
+  std::unique_ptr<network::WebsocketProcessor> Create(network::WebsocketFrameSender&) const override;
 };
 
 }  // namespace application
