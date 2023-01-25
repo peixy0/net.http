@@ -8,7 +8,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_compile_options(-Wall -Wextra -pedantic -Werror)
 
 option(BUILD_STATIC "Build static flag" OFF)
-option(BUILD_TESTS "Build tests" ON)
 option(BUILD_WITH_ADDRESS_SANITIZER "Build with address sanitize flags" OFF)
 option(BUILD_WITH_MEMORY_SANITIZER "Build with memory sanitize flags" OFF)
 option(BUILD_WITH_CLANG_TIDY "Build with clang-tidy check" OFF)
@@ -51,7 +50,7 @@ add_custom_target(
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
-if (BUILD_TESTS)
+if (BUILD_TESTING)
   add_subdirectory(externals/googletest)
   include(GoogleTest)
   enable_testing()

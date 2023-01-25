@@ -10,7 +10,7 @@ git clone https://github.com/google/googletest externals/googletest
 git clone https://github.com/gabime/spdlog externals/spdlog
 mkdir build
 cd build
-cmake .. -GNinja -DBUILD_TESTS=ON
+cmake .. -GNinja
 ninja
 ```
 
