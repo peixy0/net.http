@@ -1,6 +1,5 @@
 #include "app.hpp"
 #include <spdlog/spdlog.h>
-#include "common.hpp"
 #include "parser.hpp"
 #include "websocket.hpp"
 
@@ -44,34 +43,17 @@ void AppLayer::Process(network::HttpRequest&& req) {
 }
 
 void AppLayer::ServeWebsocket(const network::HttpRequest& req) {
-  network::HttpResponse notFoundResp;
-  notFoundResp.status = network::HttpStatus::NotFound;
-  notFoundResp.headers.emplace("Content-Type", "text/plain");
-  notFoundResp.body = "Not Found";
-
-  auto upgradeIt = req.headers.find("upgrade");
-  if (upgradeIt == req.headers.end()) {
+  network::WebsocketHandshakeBuilder handshakeBuilder{req};
+  auto resp = handshakeBuilder.Build();
+  if (not resp) {
+    network::HttpResponse notFoundResp;
+    notFoundResp.status = network::HttpStatus::NotFound;
+    notFoundResp.headers.emplace("Content-Type", "text/plain");
+    notFoundResp.body = "Not Found";
     sender.Send(std::move(notFoundResp));
     return;
   }
-  auto upgrade = upgradeIt->second;
-  common::ToLower(upgrade);
-  if (upgrade != "websocket") {
-    sender.Send(std::move(notFoundResp));
-    return;
-  }
-  auto keyIt = req.headers.find("sec-websocket-key");
-  if (keyIt == req.headers.end()) {
-    sender.Send(std::move(notFoundResp));
-    return;
-  }
-  auto accept = common::Base64(common::SHA1(keyIt->second + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
-  network::HttpResponse resp;
-  resp.status = network::HttpStatus::SwitchingProtocols;
-  resp.headers.emplace("Upgrade", "websocket");
-  resp.headers.emplace("Connection", "Upgrade");
-  resp.headers.emplace("Sec-WebSocket-Accept", std::move(accept));
-  sender.Send(std::move(resp));
+  sender.Send(std::move(*resp));
   auto websocketParser = std::make_unique<network::ConcreteWebsocketFrameParser>();
   auto websocketSender = std::make_unique<network::ConcreteWebsocketSender>(sender);
   websocketLayer = std::make_unique<WebsocketLayer>(std::move(websocketParser), std::move(websocketSender));

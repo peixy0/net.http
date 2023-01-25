@@ -1,4 +1,5 @@
 #pragma once
+#include <optional>
 #include "network.hpp"
 
 namespace network {
@@ -17,6 +18,15 @@ public:
 
 private:
   HttpSender& sender;
+};
+
+class WebsocketHandshakeBuilder {
+public:
+  explicit WebsocketHandshakeBuilder(const HttpRequest&);
+  std::optional<HttpResponse> Build() const;
+
+private:
+  const HttpRequest& request;
 };
 
 }  // namespace network

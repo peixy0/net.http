@@ -1,12 +1,13 @@
 #include <gtest/gtest.h>
 #include <spdlog/spdlog.h>
 #include "http.hpp"
+#include "websocket.hpp"
 
 using namespace testing;
 
 namespace network {
 
-TEST(HttpParserTestSuite, whenReceivedValidHttpRequest_itShouldParseTheRequest) {
+TEST(HttpParserTest, whenReceivedValidHttpRequest_itShouldParseTheRequest) {
   auto sut = std::make_unique<ConcreteHttpParser>();
   std::string p1{
       "GET /request?key=value&key2=value2 HTTP/1.1\r\n"
@@ -37,7 +38,7 @@ TEST(HttpParserTestSuite, whenReceivedValidHttpRequest_itShouldParseTheRequest) 
   ASSERT_EQ(req2->query.at("key2"), "value2");
 }
 
-TEST(HttpParserTestSuite, whenReceivedValidSwitchingProtocolRequest_itShouldParseTheRequestCorrectly) {
+TEST(HttpParserTest, whenReceivedValidSwitchingProtocolRequest_itShouldParseTheRequestCorrectly) {
   auto sut = std::make_unique<ConcreteHttpParser>();
   std::string p1{
       "GET /websocket HTTP/1.1\r\n"
@@ -58,6 +59,22 @@ TEST(HttpParserTestSuite, whenReceivedValidSwitchingProtocolRequest_itShouldPars
   ASSERT_EQ(req1->headers.at("sec-websocket-key"), "x3JJHMbDL1EzLkh9GBhXDw==");
   const auto req2 = sut->Parse();
   ASSERT_FALSE(req2);
+}
+
+TEST(WebsocketHandshakeBuilderTest, whenReceivedValidUpgradeRequest_itShouldProduceUpgradeResponse) {
+  HttpRequest req;
+  req.method = "get";
+  req.uri = "/websocket";
+  req.version = "HTTP/1.1";
+  req.headers.emplace("connection", "Upgrade, keep-alive");
+  req.headers.emplace("upgrade", "Websocket");
+  req.headers.emplace("sec-websocket-key", "x3JJHMbDL1EzLkh9GBhXDw==");
+  WebsocketHandshakeBuilder builder{req};
+  auto resp = builder.Build();
+  ASSERT_TRUE(resp);
+  ASSERT_EQ(resp->headers.at("Connection"), "Upgrade");
+  ASSERT_EQ(resp->headers.at("Upgrade"), "websocket");
+  ASSERT_EQ(resp->headers.at("Sec-WebSocket-Accept"), "HSmrc0sMlYUkAGmm5OPpG2HaGWk=");
 }
 
 }  // namespace network

@@ -1,4 +1,5 @@
 #include "websocket.hpp"
+#include "common.hpp"
 
 namespace network {
 
@@ -28,6 +29,32 @@ void ConcreteWebsocketSender::Send(WebsocketFrame&& frame) {
 
 void ConcreteWebsocketSender::Close() {
   sender.Close();
+}
+
+WebsocketHandshakeBuilder::WebsocketHandshakeBuilder(const HttpRequest& request) : request{request} {
+}
+
+std::optional<HttpResponse> WebsocketHandshakeBuilder::Build() const {
+  auto upgradeIt = request.headers.find("upgrade");
+  if (upgradeIt == request.headers.end()) {
+    return std::nullopt;
+  }
+  auto upgrade = upgradeIt->second;
+  common::ToLower(upgrade);
+  if (upgrade != "websocket") {
+    return std::nullopt;
+  }
+  auto keyIt = request.headers.find("sec-websocket-key");
+  if (keyIt == request.headers.end()) {
+    return std::nullopt;
+  }
+  auto accept = common::Base64(common::SHA1(keyIt->second + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
+  network::HttpResponse resp;
+  resp.status = network::HttpStatus::SwitchingProtocols;
+  resp.headers.emplace("Upgrade", "websocket");
+  resp.headers.emplace("Connection", "Upgrade");
+  resp.headers.emplace("Sec-WebSocket-Accept", std::move(accept));
+  return resp;
 }
 
 }  // namespace network
