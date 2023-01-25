@@ -19,8 +19,6 @@ target_link_libraries(
   core
   PRIVATE
   spdlog
-  ${OPENSSL_LIBRARIES}
-  ${CRYPTO_LIBRARIES}
 )
 
 target_include_directories(

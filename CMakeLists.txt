@@ -43,9 +43,6 @@ project(
   VERSION 1.0
 )
 
-find_library(OPENSSL_LIBRARIES ssl)
-find_library(CRYPTO_LIBRARIES crypto)
-
 add_subdirectory(src)
 
 add_custom_target(
