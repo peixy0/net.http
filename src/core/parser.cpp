@@ -47,22 +47,11 @@ std::optional<HttpRequest> ConcreteHttpParser::Parse() {
   if (payload.length() < bodyRemaining) {
     return std::nullopt;
   }
-  if (upgraded) {
-    if (payload.empty()) {
-      return std::nullopt;
-    }
-    HttpRequest request{"", "", "", {}, {}, std::move(payload)};
-    payload.clear();
-    return request;
-  }
   std::string body = payload.substr(0, bodyRemaining);
   payload.erase(0, bodyRemaining);
-  upgraded = headers.contains("upgrade");
   HttpRequest request{std::move(*method), std::move(uriBase), std::move(*version), std::move(headers), std::move(query),
       std::move(body)};
-  if (not upgraded) {
-    Reset();
-  }
+  Reset();
   return request;
 }
 
@@ -84,7 +73,6 @@ void ConcreteHttpParser::Reset() {
   headers.clear();
   headersParsed = false;
   headersEndingParsed = false;
-  upgraded = false;
   bodyRemaining = 0;
 }
 

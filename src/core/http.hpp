@@ -20,22 +20,23 @@ private:
   TcpSender& sender;
 };
 
-class HttpLayer : public network::TcpProcessor {
+class HttpLayer : public network::TcpProcessor, public network::HttpSupervisor {
 public:
-  HttpLayer(
-      const HttpOptions&, std::unique_ptr<HttpParser>, std::unique_ptr<HttpSender>, std::unique_ptr<HttpProcessor>);
+  HttpLayer(const HttpOptions&, std::unique_ptr<HttpParser>, std::unique_ptr<HttpSender>, HttpProcessorFactory&);
   HttpLayer(const HttpLayer&) = delete;
   HttpLayer(HttpLayer&&) = delete;
   HttpLayer& operator=(const HttpLayer&) = delete;
   HttpLayer& operator=(HttpLayer&&) = delete;
   ~HttpLayer() override;
   void Process(std::string_view) override;
+  void Upgrade() override;
 
 private:
   HttpOptions options;
   std::unique_ptr<HttpParser> parser;
   std::unique_ptr<HttpSender> sender;
   std::unique_ptr<HttpProcessor> processor;
+  bool upgraded{false};
 };
 
 class HttpLayerFactory : public network::TcpProcessorFactory {

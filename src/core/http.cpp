@@ -104,9 +104,12 @@ void ConcreteHttpSender::Close() {
   sender.Close();
 }
 
-HttpLayer::HttpLayer(const HttpOptions& options, std::unique_ptr<HttpParser> parser, std::unique_ptr<HttpSender> sender,
-    std::unique_ptr<HttpProcessor> processor)
-    : options{options}, parser{std::move(parser)}, sender{std::move(sender)}, processor{std::move(processor)} {
+HttpLayer::HttpLayer(const HttpOptions& options, std::unique_ptr<HttpParser> parser,
+    std::unique_ptr<HttpSender> sender_, HttpProcessorFactory& processorFactory)
+    : options{options},
+      parser{std::move(parser)},
+      sender{std::move(sender_)},
+      processor{processorFactory.Create(*sender, *this)} {
 }
 
 HttpLayer::~HttpLayer() {
@@ -116,6 +119,12 @@ HttpLayer::~HttpLayer() {
 }
 
 void HttpLayer::Process(std::string_view payload) {
+  if (upgraded) {
+    HttpRequest req;
+    req.body = payload;
+    processor->Process(std::move(req));
+    return;
+  }
   parser->Append(payload);
   size_t receivedPayloadSize = parser->GetLength();
   if (receivedPayloadSize > options.maxPayloadSize) {
@@ -134,6 +143,10 @@ void HttpLayer::Process(std::string_view payload) {
   }
 }
 
+void HttpLayer::Upgrade() {
+  upgraded = true;
+}
+
 HttpLayerFactory::HttpLayerFactory(const HttpOptions& options, HttpProcessorFactory& processorFactory)
     : options{options}, processorFactory{processorFactory} {
 }
@@ -141,8 +154,7 @@ HttpLayerFactory::HttpLayerFactory(const HttpOptions& options, HttpProcessorFact
 std::unique_ptr<network::TcpProcessor> HttpLayerFactory::Create(TcpSender& tcpSender) const {
   auto parser = std::make_unique<ConcreteHttpParser>();
   auto sender = std::make_unique<ConcreteHttpSender>(tcpSender);
-  auto processor = processorFactory.Create(*sender);
-  return std::make_unique<HttpLayer>(options, std::move(parser), std::move(sender), std::move(processor));
+  return std::make_unique<HttpLayer>(options, std::move(parser), std::move(sender), processorFactory);
 }
 
 }  // namespace network

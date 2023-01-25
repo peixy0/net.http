@@ -37,7 +37,7 @@ TEST(HttpParserTestSuite, whenReceivedValidHttpRequest_itShouldParseTheRequest) 
   ASSERT_EQ(req2->query.at("key2"), "value2");
 }
 
-TEST(HttpParserTestSuite, whenReceivedValidSwitchingProtocolRequest_itShouldParseTheRequestAndAllTheFollowingPayload) {
+TEST(HttpParserTestSuite, whenReceivedValidSwitchingProtocolRequest_itShouldParseTheRequestCorrectly) {
   auto sut = std::make_unique<ConcreteHttpParser>();
   std::string p1{
       "GET /websocket HTTP/1.1\r\n"
@@ -46,8 +46,7 @@ TEST(HttpParserTestSuite, whenReceivedValidSwitchingProtocolRequest_itShouldPars
       "Connection: Upgrade, keep-alive\r\n"
       "Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==\r\n"
       "Sec-WebSocket-Protocol: chat, superchat\r\n"
-      "Sec-WebSocket-Version: 13\r\n\r\n"
-      "RAW WEBSOCKET PAYLOAD\r\n"};
+      "Sec-WebSocket-Version: 13\r\n\r\n"};
   sut->Append(p1);
   const auto req1 = sut->Parse();
   ASSERT_TRUE(req1);
@@ -58,10 +57,7 @@ TEST(HttpParserTestSuite, whenReceivedValidSwitchingProtocolRequest_itShouldPars
   ASSERT_EQ(req1->headers.at("connection"), "Upgrade, keep-alive");
   ASSERT_EQ(req1->headers.at("sec-websocket-key"), "x3JJHMbDL1EzLkh9GBhXDw==");
   const auto req2 = sut->Parse();
-  ASSERT_TRUE(req2);
-  ASSERT_EQ(req2->body, "RAW WEBSOCKET PAYLOAD\r\n");
-  const auto req3 = sut->Parse();
-  ASSERT_FALSE(req3);
+  ASSERT_FALSE(req2);
 }
 
 }  // namespace network

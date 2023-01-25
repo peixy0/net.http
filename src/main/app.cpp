@@ -26,7 +26,8 @@ void WebsocketLayer::Process(network::HttpRequest&& req) {
   sender->Send(std::move(*frame));
 }
 
-AppLayer::AppLayer(const AppOptions& options, network::HttpSender& sender) : options{options}, sender{sender} {
+AppLayer::AppLayer(const AppOptions& options, network::HttpSender& sender, network::HttpSupervisor& supervisor)
+    : options{options}, sender{sender}, supervisor{supervisor} {
 }
 
 void AppLayer::Process(network::HttpRequest&& req) {
@@ -74,6 +75,7 @@ void AppLayer::ServeWebsocket(const network::HttpRequest& req) {
   auto websocketParser = std::make_unique<network::ConcreteWebsocketFrameParser>();
   auto websocketSender = std::make_unique<network::ConcreteWebsocketSender>(sender);
   websocketLayer = std::make_unique<WebsocketLayer>(std::move(websocketParser), std::move(websocketSender));
+  supervisor.Upgrade();
 }
 
 void AppLayer::ServeFile(const network::HttpRequest& req) {
@@ -117,8 +119,9 @@ AppLayerFactory::AppLayerFactory(const AppOptions& options_) : options{options_}
   options.wwwRoot = resolvedPath;
 }
 
-std::unique_ptr<network::HttpProcessor> AppLayerFactory::Create(network::HttpSender& sender) const {
-  return std::make_unique<AppLayer>(options, sender);
+std::unique_ptr<network::HttpProcessor> AppLayerFactory::Create(
+    network::HttpSender& sender, network::HttpSupervisor& supervisor) const {
+  return std::make_unique<AppLayer>(options, sender, supervisor);
 }
 
 }  // namespace application

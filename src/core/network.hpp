@@ -111,6 +111,12 @@ public:
   virtual void Close() = 0;
 };
 
+class HttpSupervisor {
+public:
+  virtual ~HttpSupervisor() = default;
+  virtual void Upgrade() = 0;
+};
+
 class HttpProcessor {
 public:
   virtual ~HttpProcessor() = default;
@@ -120,7 +126,7 @@ public:
 class HttpProcessorFactory {
 public:
   virtual ~HttpProcessorFactory() = default;
-  virtual std::unique_ptr<HttpProcessor> Create(HttpSender&) const = 0;
+  virtual std::unique_ptr<HttpProcessor> Create(HttpSender&, HttpSupervisor&) const = 0;
 };
 
 struct WebsocketFrame {

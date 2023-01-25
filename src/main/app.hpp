@@ -23,7 +23,7 @@ struct AppOptions {
 
 class AppLayer : public network::HttpProcessor {
 public:
-  explicit AppLayer(const AppOptions&, network::HttpSender&);
+  AppLayer(const AppOptions&, network::HttpSender&, network::HttpSupervisor&);
   ~AppLayer() override = default;
   void Process(network::HttpRequest&&) override;
 
@@ -34,13 +34,14 @@ private:
 
   AppOptions options;
   network::HttpSender& sender;
+  network::HttpSupervisor& supervisor;
   std::unique_ptr<WebsocketLayer> websocketLayer{nullptr};
 };
 
 class AppLayerFactory : public network::HttpProcessorFactory {
 public:
   AppLayerFactory(const AppOptions&);
-  std::unique_ptr<network::HttpProcessor> Create(network::HttpSender&) const override;
+  std::unique_ptr<network::HttpProcessor> Create(network::HttpSender&, network::HttpSupervisor&) const override;
 
 private:
   AppOptions options;
