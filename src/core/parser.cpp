@@ -3,47 +3,37 @@
 
 namespace network {
 
-std::optional<HttpRequest> ConcreteHttpParser::Parse() {
+std::optional<HttpRequest> ConcreteHttpParser::Parse(std::string& payload_) const {
+  std::string payload = payload_;
+  auto method = ParseToken(payload);
   if (not method) {
-    method = ParseToken(payload);
-    if (not method) {
-      return std::nullopt;
-    }
-    common::ToLower(*method);
+    return std::nullopt;
   }
+  common::ToLower(*method);
+  auto uri = ParseToken(payload);
   if (not uri) {
-    uri = ParseToken(payload);
-    if (not uri) {
-      return std::nullopt;
-    }
-    uriBase = ParseUriBase(*uri);
-    query = ParseQueryString(*uri);
+    return std::nullopt;
   }
+  auto uriBase = ParseUriBase(*uri);
+  auto query = ParseQueryString(*uri);
+  auto version = ParseToken(payload);
   if (not version) {
-    version = ParseToken(payload);
-    if (not version) {
-      return std::nullopt;
-    }
+    return std::nullopt;
   }
+  auto requestLineEndingParsed = Consume(payload, "\r\n");
   if (not requestLineEndingParsed) {
-    requestLineEndingParsed = Consume(payload, "\r\n");
-    if (not requestLineEndingParsed) {
-      return std::nullopt;
-    }
+    return std::nullopt;
   }
+  HttpHeaders headers;
+  auto headersParsed = ParseHeaders(payload, headers);
   if (not headersParsed) {
-    headersParsed = ParseHeaders(payload, headers);
-    if (not headersParsed) {
-      return std::nullopt;
-    }
+    return std::nullopt;
   }
+  auto headersEndingParsed = Consume(payload, "\r\n");
   if (not headersEndingParsed) {
-    headersEndingParsed = Consume(payload, "\r\n");
-    if (not headersEndingParsed) {
-      return std::nullopt;
-    }
-    bodyRemaining = FindContentLength(headers);
+    return std::nullopt;
   }
+  auto bodyRemaining = FindContentLength(headers);
   if (payload.length() < bodyRemaining) {
     return std::nullopt;
   }
@@ -51,29 +41,8 @@ std::optional<HttpRequest> ConcreteHttpParser::Parse() {
   payload.erase(0, bodyRemaining);
   HttpRequest request{std::move(*method), std::move(uriBase), std::move(*version), std::move(headers), std::move(query),
       std::move(body)};
-  Reset();
+  payload_ = payload;
   return request;
-}
-
-void ConcreteHttpParser::Append(std::string_view received) {
-  receivedLength += received.length();
-  payload += received;
-}
-
-size_t ConcreteHttpParser::GetLength() const {
-  return receivedLength;
-}
-
-void ConcreteHttpParser::Reset() {
-  receivedLength = payload.length();
-  method.reset();
-  uri.reset();
-  version.reset();
-  requestLineEndingParsed = false;
-  headers.clear();
-  headersParsed = false;
-  headersEndingParsed = false;
-  bodyRemaining = 0;
 }
 
 void ConcreteHttpParser::SkipWhiteSpaces(std::string& payload) const {
@@ -207,11 +176,7 @@ HttpQuery ConcreteHttpParser::ParseQueryString(std::string& uri) const {
   return result;
 }
 
-void ConcreteWebsocketFrameParser::Append(std::string_view buffer) {
-  payload += buffer;
-}
-
-std::optional<WebsocketFrame> ConcreteWebsocketFrameParser::Parse() {
+std::optional<WebsocketFrame> ConcreteWebsocketFrameParser::Parse(std::string& payload) const {
   int payloadLen = payload.length();
   int requiredLen = headerLen;
   if (payloadLen < requiredLen) {

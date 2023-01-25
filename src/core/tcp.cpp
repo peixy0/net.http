@@ -158,7 +158,8 @@ TcpSender& TcpConnectionContext::GetSender() {
   return *sender;
 }
 
-TcpLayer::TcpLayer(TcpProcessorFactory& processorFactory) : processorFactory{processorFactory} {
+TcpLayer::TcpLayer(std::unique_ptr<TcpProcessorFactory> processorFactory)
+    : processorFactory{std::move(processorFactory)} {
 }
 
 TcpLayer::~TcpLayer() {
@@ -269,7 +270,7 @@ void TcpLayer::SetupPeer() {
   MarkReceiverPending(s);
 
   auto sender = std::make_unique<ConcreteTcpSender>(s, *this);
-  auto processor = processorFactory.Create(*sender);
+  auto processor = processorFactory->Create(*sender);
   connections.try_emplace(s, s, std::move(processor), std::move(sender));
 }
 
@@ -315,8 +316,8 @@ void TcpLayer::SendToPeer(int peerDescriptor) {
   context.GetSender().SendBuffered();
 }
 
-Tcp4Layer::Tcp4Layer(std::string_view host, std::uint16_t port, TcpProcessorFactory& processorFactory)
-    : TcpLayer{processorFactory}, host{host}, port{port} {
+Tcp4Layer::Tcp4Layer(std::string_view host, std::uint16_t port, std::unique_ptr<TcpProcessorFactory> processorFactory)
+    : TcpLayer{std::move(processorFactory)}, host{host}, port{port} {
 }
 
 int Tcp4Layer::CreateSocket() {

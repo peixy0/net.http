@@ -88,7 +88,7 @@ private:
 
 class TcpLayer : public TcpSenderSupervisor {
 public:
-  explicit TcpLayer(TcpProcessorFactory&);
+  explicit TcpLayer(std::unique_ptr<TcpProcessorFactory>);
   TcpLayer(const TcpLayer&) = delete;
   TcpLayer(TcpLayer&&) = delete;
   TcpLayer& operator=(const TcpLayer&) = delete;
@@ -113,7 +113,7 @@ private:
   void PurgeExpiredConnections();
   int FindMostRecentTimeout() const;
 
-  TcpProcessorFactory& processorFactory;
+  std::unique_ptr<TcpProcessorFactory> processorFactory;
   int localDescriptor{-1};
   int epollDescriptor{-1};
   std::unordered_map<int, TcpConnectionContext> connections;
@@ -121,7 +121,7 @@ private:
 
 class Tcp4Layer : public TcpLayer {
 public:
-  Tcp4Layer(std::string_view, std::uint16_t, TcpProcessorFactory&);
+  Tcp4Layer(std::string_view, std::uint16_t, std::unique_ptr<TcpProcessorFactory>);
 
 protected:
   int CreateSocket() override;

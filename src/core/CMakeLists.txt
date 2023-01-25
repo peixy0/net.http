@@ -9,6 +9,8 @@ add_library(
   network.hpp
   parser.cpp
   parser.hpp
+  protocol.cpp
+  protocol.hpp
   tcp.cpp
   tcp.hpp
   websocket.cpp

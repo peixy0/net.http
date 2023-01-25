@@ -3,7 +3,9 @@
 #include "app.hpp"
 #include "http.hpp"
 #include "network.hpp"
+#include "protocol.hpp"
 #include "tcp.hpp"
+#include "websocket.hpp"
 
 int main(int argc, char* argv[]) {
   if (argc < 4) {
@@ -15,17 +17,17 @@ int main(int argc, char* argv[]) {
 
   application::AppOptions appOptions;
   appOptions.wwwRoot = argv[3];
-  application::AppLayerFactory appFactory{appOptions};
-
-  network::HttpOptions httpOptions;
-  httpOptions.maxPayloadSize = 1 << 20;
-  network::HttpLayerFactory httpLayerFactory{httpOptions, appFactory};
 
   std::vector<std::thread> workers;
   const int nWorkers = std::thread::hardware_concurrency();
   for (int i = 0; i < nWorkers; i++) {
-    workers.emplace_back(std::thread([&host, &port, &httpLayerFactory] {
-      network::Tcp4Layer tcp{host, port, httpLayerFactory};
+    workers.emplace_back(std::thread([&host, &port, &appOptions] {
+      auto appFactory = std::make_unique<application::AppLayerFactory>(appOptions);
+      auto httpLayerFactory = std::make_unique<network::ConcreteHttpLayerFactory>(std::move(appFactory));
+      auto protocolLayerFactory = std::make_unique<network::ProtocolLayerFactory>(std::move(httpLayerFactory));
+      auto websocketLayerFactory = std::make_unique<network::ConcreteWebsocketLayerFactory>();
+      protocolLayerFactory->Add(std::move(websocketLayerFactory));
+      network::Tcp4Layer tcp{host, port, std::move(protocolLayerFactory)};
       tcp.Start();
     }));
   }

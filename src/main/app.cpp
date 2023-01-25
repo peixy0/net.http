@@ -5,36 +5,12 @@
 
 namespace application {
 
-WebsocketLayer::WebsocketLayer(
-    std::unique_ptr<network::WebsocketFrameParser> parser, std::unique_ptr<network::WebsocketSender> sender)
-    : parser{std::move(parser)}, sender{std::move(sender)} {
-}
-
-void WebsocketLayer::Process(network::HttpRequest&& req) {
-  parser->Append(req.body);
-  auto frame = parser->Parse();
-  if (not frame) {
-    return;
-  }
-  spdlog::debug("app received websocket frame: fin = {}, opcode = {}", frame->fin, frame->opcode);
-  if (frame->opcode == opClose) {
-    sender->Close();
-    return;
-  }
-  spdlog::debug("app received websocket message: {}", frame->payload);
-  sender->Send(std::move(*frame));
-}
-
-AppLayer::AppLayer(const AppOptions& options, network::HttpSender& sender, network::HttpSupervisor& supervisor)
-    : options{options}, sender{sender}, supervisor{supervisor} {
+AppLayer::AppLayer(const AppOptions& options, network::HttpSender& sender, network::ProtocolUpgrader& upgrader)
+    : options{options}, sender{sender}, upgrader{upgrader} {
 }
 
 void AppLayer::Process(network::HttpRequest&& req) {
   spdlog::debug("app received request {} {} {}", req.method, req.uri, req.version);
-  if (websocketLayer) {
-    websocketLayer->Process(std::move(req));
-    return;
-  }
   if (req.uri == "/ws") {
     ServeWebsocket(req);
     return;
@@ -54,10 +30,7 @@ void AppLayer::ServeWebsocket(const network::HttpRequest& req) {
     return;
   }
   sender.Send(std::move(*resp));
-  auto websocketParser = std::make_unique<network::ConcreteWebsocketFrameParser>();
-  auto websocketSender = std::make_unique<network::ConcreteWebsocketSender>(sender);
-  websocketLayer = std::make_unique<WebsocketLayer>(std::move(websocketParser), std::move(websocketSender));
-  supervisor.Upgrade();
+  upgrader.UpgradeToWebsocket();
 }
 
 void AppLayer::ServeFile(const network::HttpRequest& req) {
@@ -102,8 +75,8 @@ AppLayerFactory::AppLayerFactory(const AppOptions& options_) : options{options_}
 }
 
 std::unique_ptr<network::HttpProcessor> AppLayerFactory::Create(
-    network::HttpSender& sender, network::HttpSupervisor& supervisor) const {
-  return std::make_unique<AppLayer>(options, sender, supervisor);
+    network::HttpSender& sender, network::ProtocolUpgrader& upgrader) const {
+  return std::make_unique<AppLayer>(options, sender, upgrader);
 }
 
 }  // namespace application

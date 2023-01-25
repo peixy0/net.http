@@ -36,8 +36,28 @@ public:
   virtual std::unique_ptr<TcpProcessor> Create(TcpSender&) const = 0;
 };
 
-struct HttpOptions {
-  size_t maxPayloadSize;
+class ProtocolUpgrader {
+public:
+  virtual ~ProtocolUpgrader() = default;
+  virtual void UpgradeToWebsocket() = 0;
+};
+
+class ProtocolProcessor {
+public:
+  virtual ~ProtocolProcessor() = default;
+  virtual void Process(std::string&) = 0;
+};
+
+class HttpLayerFactory {
+public:
+  virtual ~HttpLayerFactory() = default;
+  virtual std::unique_ptr<ProtocolProcessor> Create(TcpSender&, ProtocolUpgrader&) const = 0;
+};
+
+class WebsocketLayerFactory {
+public:
+  virtual ~WebsocketLayerFactory() = default;
+  virtual std::unique_ptr<ProtocolProcessor> Create(TcpSender&) const = 0;
 };
 
 using HttpQuery = std::unordered_map<std::string, std::string>;
@@ -93,28 +113,19 @@ struct ChunkedDataHttpResponse {
 class HttpParser {
 public:
   virtual ~HttpParser() = default;
-  virtual std::optional<HttpRequest> Parse() = 0;
-  virtual void Append(std::string_view) = 0;
-  virtual size_t GetLength() const = 0;
+  virtual std::optional<HttpRequest> Parse(std::string&) const = 0;
 };
 
 class HttpSender {
 public:
   virtual ~HttpSender() = default;
   virtual void Send(HttpResponse&&) = 0;
-  virtual void Send(RawHttpResponse&&) = 0;
   virtual void Send(FileHttpResponse&&) = 0;
   virtual void Send(MixedReplaceHeaderHttpResponse&&) = 0;
   virtual void Send(MixedReplaceDataHttpResponse&&) = 0;
   virtual void Send(ChunkedHeaderHttpResponse&&) = 0;
   virtual void Send(ChunkedDataHttpResponse&&) = 0;
   virtual void Close() = 0;
-};
-
-class HttpSupervisor {
-public:
-  virtual ~HttpSupervisor() = default;
-  virtual void Upgrade() = 0;
 };
 
 class HttpProcessor {
@@ -126,7 +137,7 @@ public:
 class HttpProcessorFactory {
 public:
   virtual ~HttpProcessorFactory() = default;
-  virtual std::unique_ptr<HttpProcessor> Create(HttpSender&, HttpSupervisor&) const = 0;
+  virtual std::unique_ptr<HttpProcessor> Create(HttpSender&, ProtocolUpgrader&) const = 0;
 };
 
 struct WebsocketFrame {
@@ -138,8 +149,7 @@ struct WebsocketFrame {
 class WebsocketFrameParser {
 public:
   virtual ~WebsocketFrameParser() = default;
-  virtual std::optional<WebsocketFrame> Parse() = 0;
-  virtual void Append(std::string_view) = 0;
+  virtual std::optional<WebsocketFrame> Parse(std::string&) const = 0;
 };
 
 class WebsocketSender {

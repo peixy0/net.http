@@ -14,9 +14,7 @@ public:
   ConcreteHttpParser& operator=(ConcreteHttpParser&&) = delete;
   ~ConcreteHttpParser() override = default;
 
-  std::optional<HttpRequest> Parse() override;
-  void Append(std::string_view) override;
-  size_t GetLength() const override;
+  std::optional<HttpRequest> Parse(std::string&) const override;
 
 private:
   void Reset();
@@ -32,19 +30,6 @@ private:
   std::string ParseQueryKey(std::string&) const;
   std::string ParseQueryValue(std::string&) const;
   HttpQuery ParseQueryString(std::string&) const;
-
-  std::string payload;
-  size_t receivedLength{0};
-  std::optional<std::string> method;
-  std::optional<std::string> uri;
-  std::string uriBase;
-  HttpQuery query;
-  std::optional<std::string> version;
-  bool requestLineEndingParsed{false};
-  HttpHeaders headers;
-  bool headersParsed{false};
-  bool headersEndingParsed{false};
-  size_t bodyRemaining{0};
 };
 
 class ConcreteWebsocketFrameParser : public WebsocketFrameParser {
@@ -56,11 +41,9 @@ public:
   ConcreteWebsocketFrameParser& operator=(ConcreteWebsocketFrameParser&&) = delete;
   ~ConcreteWebsocketFrameParser() override = default;
 
-  std::optional<WebsocketFrame> Parse() override;
-  void Append(std::string_view) override;
+  std::optional<WebsocketFrame> Parse(std::string&) const override;
 
 private:
-  std::string payload;
   static constexpr std::uint8_t headerLen = 2;
   static constexpr std::uint8_t maskLen = 4;
   static constexpr std::uint8_t ext1Len = 2;
