@@ -1,11 +1,8 @@
 #include <spdlog/spdlog.h>
 #include <thread>
 #include "app.hpp"
-#include "http.hpp"
 #include "network.hpp"
-#include "protocol.hpp"
-#include "tcp.hpp"
-#include "websocket.hpp"
+#include "server.hpp"
 
 int main(int argc, char* argv[]) {
   if (argc < 4) {
@@ -17,20 +14,23 @@ int main(int argc, char* argv[]) {
 
   application::AppOptions appOptions;
   appOptions.wwwRoot = argv[3];
+  application::AppLayer appLayer{appOptions};
 
   std::vector<std::thread> workers;
   const int nWorkers = std::thread::hardware_concurrency();
   for (int i = 0; i < nWorkers; i++) {
-    workers.emplace_back(std::thread([&host, &port, &appOptions] {
-      auto appHttpProcessorFactory = std::make_unique<application::AppHttpProcessorFactory>(appOptions);
-      auto httpLayerFactory = std::make_unique<network::ConcreteHttpLayerFactory>(std::move(appHttpProcessorFactory));
-      auto protocolLayerFactory = std::make_unique<network::ProtocolLayerFactory>(std::move(httpLayerFactory));
-      auto appWebsocketProcessorFactory = std::make_unique<application::AppWebsocketProcessorFactory>();
-      auto websocketLayerFactory =
-          std::make_unique<network::ConcreteWebsocketLayerFactory>(std::move(appWebsocketProcessorFactory));
-      protocolLayerFactory->Add(std::move(websocketLayerFactory));
-      network::Tcp4Layer tcp{host, port, std::move(protocolLayerFactory)};
-      tcp.Start();
+    workers.emplace_back(std::thread([&host, &port, &appLayer] {
+      network::Server server;
+      server.Add(network::HttpMethod::GET, "^/$", [&appLayer](network::HttpRequest&& req, network::HttpSender& sender) {
+        appLayer.Process(std::move(req), sender);
+      });
+      server.Add(network::HttpMethod::GET, "^/static/.*$",
+          [&appLayer](
+              network::HttpRequest&& req, network::HttpSender& sender) { appLayer.Process(std::move(req), sender); });
+      server.Add("^/ws$", [&appLayer](network::WebsocketFrame&& req, network::WebsocketSender& sender) {
+        appLayer.Process(std::move(req), sender);
+      });
+      server.Start(host, port);
     }));
   }
   for (auto& worker : workers) {
