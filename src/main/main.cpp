@@ -17,8 +17,8 @@ int main(int argc, char* argv[]) {
   application::AppLayer appLayer{appOptions};
 
   std::vector<std::thread> workers;
-  const int nWorkers = std::thread::hardware_concurrency();
-  for (int i = 0; i < nWorkers; i++) {
+  const std::size_t nWorkers = std::thread::hardware_concurrency();
+  for (std::size_t i = 0; i < nWorkers; i++) {
     workers.emplace_back(std::thread([&host, &port, &appLayer] {
       network::Server server;
       server.Add(network::HttpMethod::GET, "^/$", [&appLayer](network::HttpRequest&& req, network::HttpSender& sender) {

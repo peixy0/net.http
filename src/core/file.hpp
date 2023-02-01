@@ -13,12 +13,12 @@ public:
   File& operator=(File&&);
 
   int Fd() const;
-  int Size() const;
+  size_t Size() const;
   bool Ok() const;
 
 private:
   int fd;
-  int size;
+  std::size_t size;
 };
 
 }  // namespace os

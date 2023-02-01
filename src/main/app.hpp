@@ -10,7 +10,7 @@ struct AppOptions {
 
 class AppLayer {
 public:
-  AppLayer(const AppOptions&);
+  explicit AppLayer(const AppOptions&);
   void Process(network::HttpRequest&&, network::HttpSender&);
   void Process(network::WebsocketFrame&&, network::WebsocketSender&);
 
