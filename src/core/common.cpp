@@ -10,9 +10,9 @@ std::uint32_t LeftRotate(std::uint32_t a, std::uint8_t k) {
 
 namespace common {
 
-char ToChar(std::uint8_t n) {
-  char c = 0;
-  reinterpret_cast<std::uint8_t&>(c) = n & 0xff;
+char ToChar(std::uint64_t n) {
+  char c;
+  reinterpret_cast<std::uint8_t&>(c) = static_cast<std::uint8_t>(n & 0xff);
   return c;
 }
 
@@ -31,10 +31,11 @@ std::string SHA1(std::string_view s) {
   std::uint32_t h4 = 0xC3D2E1F0;
 
   std::uint64_t ml = payload.size();
-  payload += ToChar(0x80);
   std::uint64_t padLen = (56 - ((ml + 1) % 64) + 64) % 64;
+  payload.reserve(ml + padLen + 8);
+  payload += ToChar(0x80);
   for (std::uint64_t i = 0; i < padLen; i++) {
-    payload += static_cast<char>(0);
+    payload += ToChar(0);
   }
   ml <<= 3;
   payload += ToChar(ml >> 56);
