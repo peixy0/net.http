@@ -5,9 +5,9 @@
 
 namespace network {
 
-class ProtocolUpgraderMock : public ProtocolUpgrader {
+class ProtocolDispatcherMock : public ProtocolDispatcher {
 public:
-  MOCK_METHOD(void, UpgradeToWebsocket, (), (override));
+  MOCK_METHOD(void, SetProcessor, (ProtocolProcessor*), (override));
 };
 
 class HttpSenderMock : public HttpSender {
