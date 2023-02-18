@@ -1,23 +1,23 @@
 #pragma once
-#include <optional>
+#include <deque>
+#include <mutex>
+#include <thread>
 #include "network.hpp"
+#include "probe.hpp"
 
 namespace application {
 
-struct AppOptions {
-  std::string wwwRoot;
-};
-
 class AppLayer {
 public:
-  explicit AppLayer(const AppOptions&);
-  void Process(network::HttpRequest&&, network::HttpSender&);
-  void Process(network::WebsocketFrame&&, network::WebsocketSender&);
+  AppLayer();
+  void GetProbe(network::HttpSender&);
 
 private:
-  std::string MimeTypeOf(std::string_view) const;
-
-  const AppOptions options;
+  std::thread t;
+  std::deque<Probe> probes;
+  int count{0};
+  static const int maxCount{289};
+  std::mutex mutex;
 };
 
 }  // namespace application

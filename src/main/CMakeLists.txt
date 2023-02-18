@@ -3,6 +3,7 @@ add_executable(
   main.cpp
   app.cpp
   app.hpp
+  probe.hpp
 )
 
 target_link_libraries(

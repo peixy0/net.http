@@ -1,46 +1,50 @@
 #include "app.hpp"
 #include <spdlog/spdlog.h>
-#include <filesystem>
 
 namespace application {
 
-AppLayer::AppLayer(const AppOptions& options) : options{options} {
+AppLayer::AppLayer() {
+  t = std::thread([this] {
+    while (true) {
+      const Probe p;
+      {
+        std::lock_guard lock{mutex};
+        probes.emplace_back(std::move(p));
+        ++count;
+        while (count > maxCount) {
+          probes.pop_front();
+          --count;
+        }
+      }
+      using namespace std::chrono_literals;
+      std::this_thread::sleep_for(5min);
+    }
+  });
 }
 
-void AppLayer::Process(network::HttpRequest&& req, network::HttpSender& sender) {
-  std::string uri = req.uri;
-  if (uri.ends_with("/")) {
-    uri += "index.html";
+void AppLayer::GetProbe(network::HttpSender& sender) {
+  network::HttpResponse resp;
+  resp.body = "[\n";
+  {
+    std::lock_guard lock{mutex};
+    for (int i = 1; i < count; i++) {
+      std::int64_t d1 = probes[i].GetCpuSum() - probes[i - 1].GetCpuSum();
+      std::int64_t d2 = probes[i].GetCpuIdle() - probes[i - 1].GetCpuIdle();
+      float f = 1 - d2 / static_cast<float>(d1);
+      resp.body += "{\"timestamp\": " + std::to_string(probes[i].GetTimestamp()) + ", \"cpu\": " + std::to_string(f) +
+                   ", \"memtotal\": " + std::to_string(probes[i].GetMemTotal()) +
+                   ", \"memfree\": " + std::to_string(probes[i].GetMemFree()) +
+                   ", \"memavail\": " + std::to_string(probes[i].GetMemAvail()) + "}";
+      if (i < count - 1) {
+        resp.body += ", ";
+      }
+      resp.body += '\n';
+    }
   }
-  if (uri.starts_with("/")) {
-    uri.erase(0, 1);
-  }
-  const auto path = std::filesystem::path{options.wwwRoot} / std::filesystem::path{uri};
-  const auto pathStr = path.string();
-  spdlog::debug("request local path is {}", pathStr);
-  if (not pathStr.starts_with(options.wwwRoot)) {
-    network::HttpResponse resp;
-    resp.status = network::HttpStatus::NotFound;
-    resp.headers.emplace("Content-Type", "text/plain");
-    resp.body = "No such file";
-    return sender.Send(std::move(resp));
-  }
-  std::string mimeType = MimeTypeOf(pathStr);
-  network::FileHttpResponse resp;
-  resp.path = std::move(pathStr);
-  resp.headers.emplace("Content-type", std::move(mimeType));
-  return sender.Send(std::move(resp));
-}
-
-std::string AppLayer::MimeTypeOf(std::string_view path) const {
-  if (path.ends_with(".html")) {
-    return "text/html";
-  }
-  return "text/plain";
-}
-
-void AppLayer::Process(network::WebsocketFrame&& frame, network::WebsocketSender& sender) {
-  sender.Send(std::move(frame));
+  resp.body += "]";
+  resp.status = network::HttpStatus::OK;
+  resp.headers.emplace("Content-Type", "application/json");
+  sender.Send(std::move(resp));
 }
 
 }  // namespace application
