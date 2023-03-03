@@ -1,5 +1,5 @@
 # net.system
-Simple async HTTP interface written in modern C++
+Simple HTTP interface written in modern C++
 
 # build
 ```bash
