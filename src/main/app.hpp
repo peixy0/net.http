@@ -7,6 +7,17 @@
 
 namespace application {
 
+struct ProbeInfo {
+  std::int64_t timestamp;
+  std::int64_t cpuSum;
+  std::int64_t cpuIdle;
+  std::int64_t memTotal;
+  std::int64_t memFree;
+  std::int64_t memAvail;
+  std::int64_t netTx;
+  std::int64_t netRx;
+};
+
 class AppLayer {
 public:
   AppLayer();
@@ -14,7 +25,7 @@ public:
 
 private:
   std::thread t;
-  std::deque<Probe> probes;
+  std::deque<ProbeInfo> probes;
   int count{0};
   static const int maxCount{289};
   std::mutex mutex;
