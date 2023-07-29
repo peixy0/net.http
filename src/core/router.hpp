@@ -50,35 +50,48 @@ private:
 class ConcreteRouter final : public Router {
 public:
   ConcreteRouter(HttpRouteMapping& httpMapping, WebsocketRouteMapping& websocketMapping, TcpSender& sender)
-      : httpMapping{httpMapping},
-        httpSender{sender},
-        httpLayer{httpParser, httpSender, *this},
-        websocketMapping{websocketMapping},
-        websocketSender{sender},
-        websocketLayer{websocketParser, websocketSender, *this},
-        protocolProcessorDelegate{&httpLayer} {
+      : httpAggregation{httpMapping, sender, *this},
+        websocketAggregation{websocketMapping, sender, *this},
+        protocolProcessorDelegate{&httpAggregation.httpLayer} {
   }
 
   bool TryProcess(std::string& buffer) override {
     return protocolProcessorDelegate->TryProcess(buffer);
   }
 
-  void Process(HttpRequest&& req) override;
-  void Process(WebsocketFrame&& req) override;
+  void Process(HttpRequest&&) override;
+  void Process(WebsocketFrame&&) override;
 
 private:
+  struct HttpAggregation {
+    HttpAggregation(HttpRouteMapping& httpMapping, TcpSender& tcpSender, HttpProcessor& httpProcessor)
+        : httpMapping{httpMapping}, httpSender{tcpSender}, httpLayer{httpParser, httpSender, httpProcessor} {
+    }
+    HttpRouteMapping& httpMapping;
+    ConcreteHttpSender httpSender;
+    ConcreteHttpParser httpParser;
+    HttpLayer httpLayer;
+    std::unique_ptr<HttpProcessor> httpProcessor{nullptr};
+  };
+
+  struct WebsocketAggregation {
+    WebsocketAggregation(
+        WebsocketRouteMapping& websocketMapping, TcpSender& tcpSender, WebsocketProcessor& websocketProcessor)
+        : websocketMapping{websocketMapping},
+          websocketSender{tcpSender},
+          websocketLayer{websocketParser, websocketSender, websocketProcessor} {
+    }
+    WebsocketRouteMapping& websocketMapping;
+    ConcreteWebsocketSender websocketSender;
+    ConcreteWebsocketParser websocketParser;
+    WebsocketLayer websocketLayer;
+    std::unique_ptr<WebsocketProcessor> websocketProcessor{nullptr};
+  };
+
   bool TryUpgradeToWebsocket(const HttpRequest& req);
 
-  HttpRouteMapping& httpMapping;
-  ConcreteHttpSender httpSender;
-  ConcreteHttpParser httpParser;
-  HttpLayer httpLayer;
-  WebsocketRouteMapping& websocketMapping;
-  ConcreteWebsocketSender websocketSender;
-  ConcreteWebsocketParser websocketParser;
-  WebsocketLayer websocketLayer;
-  std::unique_ptr<HttpProcessor> httpProcessor;
-  std::unique_ptr<WebsocketProcessor> websocketProcessor;
+  HttpAggregation httpAggregation;
+  WebsocketAggregation websocketAggregation;
   ProtocolProcessor* protocolProcessorDelegate;
 };
 
