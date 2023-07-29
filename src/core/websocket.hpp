@@ -56,7 +56,7 @@ public:
   WebsocketLayer& operator=(WebsocketLayer&&) = delete;
   ~WebsocketLayer() override = default;
 
-  bool TryProcess(std::string&) const override;
+  bool TryProcess(std::string&) override;
 
 private:
   WebsocketParser& parser;

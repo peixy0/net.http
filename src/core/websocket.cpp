@@ -117,7 +117,7 @@ WebsocketLayer::WebsocketLayer(WebsocketParser& parser, WebsocketSender& sender,
     : parser{parser}, sender{sender}, processor{processor} {
 }
 
-bool WebsocketLayer::TryProcess(std::string& payload) const {
+bool WebsocketLayer::TryProcess(std::string& payload) {
   auto frame = parser.Parse(payload);
   if (not frame) {
     return false;

@@ -49,23 +49,25 @@ private:
 
 class ConcreteRouter final : public Router {
 public:
-  ConcreteRouter(HttpRouteMapping& httpMapping, WebsocketRouteMapping& websocketMapping, TcpSender& sender,
-      ProtocolDispatcher& dispatcher)
+  ConcreteRouter(HttpRouteMapping& httpMapping, WebsocketRouteMapping& websocketMapping, TcpSender& sender)
       : httpMapping{httpMapping},
         httpSender{sender},
         httpLayer{httpParser, httpSender, *this},
         websocketMapping{websocketMapping},
         websocketSender{sender},
         websocketLayer{websocketParser, websocketSender, *this},
-        dispatcher{dispatcher} {
-    dispatcher.SetProcessor(&httpLayer);
+        protocolProcessorDelegate{&httpLayer} {
+  }
+
+  bool TryProcess(std::string& buffer) override {
+    return protocolProcessorDelegate->TryProcess(buffer);
   }
 
   void Process(HttpRequest&& req) override;
   void Process(WebsocketFrame&& req) override;
 
 private:
-  bool TryUpgrade(const HttpRequest& req);
+  bool TryUpgradeToWebsocket(const HttpRequest& req);
 
   HttpRouteMapping& httpMapping;
   ConcreteHttpSender httpSender;
@@ -75,9 +77,9 @@ private:
   ConcreteWebsocketSender websocketSender;
   ConcreteWebsocketParser websocketParser;
   WebsocketLayer websocketLayer;
-  ProtocolDispatcher& dispatcher;
   std::unique_ptr<HttpProcessor> httpProcessor;
   std::unique_ptr<WebsocketProcessor> websocketProcessor;
+  ProtocolProcessor* protocolProcessorDelegate;
 };
 
 class ConcreteRouterFactory final : public RouterFactory {
@@ -86,8 +88,8 @@ public:
       : httpMapping{httpMapping}, websocketMapping{websocketMapping} {
   }
 
-  std::unique_ptr<Router> Create(TcpSender& sender, ProtocolDispatcher& dispatcher) const override {
-    return std::make_unique<ConcreteRouter>(httpMapping, websocketMapping, sender, dispatcher);
+  std::unique_ptr<Router> Create(TcpSender& sender) const override {
+    return std::make_unique<ConcreteRouter>(httpMapping, websocketMapping, sender);
   }
 
 private:

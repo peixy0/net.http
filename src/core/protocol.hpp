@@ -4,9 +4,9 @@
 
 namespace network {
 
-class ProtocolLayer final : public TcpProcessor, public ProtocolDispatcher {
+class ProtocolLayer final : public TcpProcessor {
 public:
-  ProtocolLayer(TcpSender& sender, RouterFactory& routerFactory) : router{routerFactory.Create(sender, *this)} {
+  ProtocolLayer(TcpSender& sender, RouterFactory& routerFactory) : router{routerFactory.Create(sender)} {
   }
   ProtocolLayer(const ProtocolLayer&) = delete;
   ProtocolLayer(ProtocolLayer&&) = delete;
@@ -16,20 +16,12 @@ public:
 
   void Process(std::string_view payload) override {
     buffer += payload;
-    if (not processor) {
-      return;
+    while (router->TryProcess(buffer)) {
     }
-    while (processor->TryProcess(buffer)) {
-    }
-  }
-
-  void SetProcessor(ProtocolProcessor* processor_) override {
-    processor = processor_;
   }
 
 private:
   std::string buffer;
-  ProtocolProcessor* processor{nullptr};
   std::unique_ptr<Router> router;
 };
 

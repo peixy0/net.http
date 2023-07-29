@@ -5,11 +5,6 @@
 
 namespace network {
 
-class ProtocolDispatcherMock : public ProtocolDispatcher {
-public:
-  MOCK_METHOD(void, SetProcessor, (ProtocolProcessor*), (override));
-};
-
 class HttpSenderMock : public HttpSender {
 public:
   MOCK_METHOD(void, Send, (HttpResponse &&), (const, override));

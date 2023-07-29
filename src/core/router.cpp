@@ -2,7 +2,7 @@
 
 namespace network {
 
-bool ConcreteRouter::TryUpgrade(const HttpRequest& req) {
+bool ConcreteRouter::TryUpgradeToWebsocket(const HttpRequest& req) {
   auto* entry = websocketMapping.Get(req.uri);
   if (not entry) {
     return false;
@@ -12,15 +12,15 @@ bool ConcreteRouter::TryUpgrade(const HttpRequest& req) {
   if (not resp) {
     return false;
   }
-  httpProcessor.reset();
-  dispatcher.SetProcessor(&websocketLayer);
-  websocketProcessor = entry->Create(websocketSender);
   httpSender.Send(std::move(*resp));
+  httpProcessor.reset();
+  websocketProcessor = entry->Create(websocketSender);
+  protocolProcessorDelegate = &websocketLayer;
   return true;
 }
 
 void ConcreteRouter::Process(HttpRequest&& req) {
-  if (TryUpgrade(req)) {
+  if (TryUpgradeToWebsocket(req)) {
     return;
   }
   auto entry = httpMapping.Get(req.method, req.uri);

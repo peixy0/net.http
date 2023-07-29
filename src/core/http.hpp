@@ -55,7 +55,7 @@ public:
   HttpLayer& operator=(HttpLayer&&) = delete;
   ~HttpLayer() override = default;
 
-  bool TryProcess(std::string&) const override;
+  bool TryProcess(std::string&) override;
 
 private:
   HttpParser& parser;

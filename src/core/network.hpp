@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -39,13 +40,7 @@ public:
 class ProtocolProcessor {
 public:
   virtual ~ProtocolProcessor() = default;
-  virtual bool TryProcess(std::string&) const = 0;
-};
-
-class ProtocolDispatcher {
-public:
-  virtual ~ProtocolDispatcher() = default;
-  virtual void SetProcessor(ProtocolProcessor*) = 0;
+  virtual bool TryProcess(std::string&) = 0;
 };
 
 enum class HttpMethod { PUT, GET, POST, DELETE };
@@ -161,7 +156,7 @@ public:
   virtual std::unique_ptr<WebsocketProcessor> Create(WebsocketSender&) const = 0;
 };
 
-class Router : public HttpProcessor, public WebsocketProcessor {
+class Router : public ProtocolProcessor, public HttpProcessor, public WebsocketProcessor {
 public:
   ~Router() override = default;
 };
@@ -169,7 +164,7 @@ public:
 class RouterFactory {
 public:
   virtual ~RouterFactory() = default;
-  virtual std::unique_ptr<Router> Create(TcpSender&, ProtocolDispatcher&) const = 0;
+  virtual std::unique_ptr<Router> Create(TcpSender&) const = 0;
 };
 
 }  // namespace network
