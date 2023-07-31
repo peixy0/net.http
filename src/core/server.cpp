@@ -40,7 +40,7 @@ namespace network {
 void Server::Start(std::string_view host, std::uint16_t port) {
   auto routerFactory = std::make_unique<ConcreteRouterFactory>(httpMapping, websocketMapping);
   auto protocolLayerFactory = std::make_unique<ProtocolLayerFactory>(*routerFactory);
-  Tcp4Layer tcp{host, port, std::move(protocolLayerFactory)};
+  Tcp4Layer tcp{host, port, *protocolLayerFactory};
   tcp.Start();
 }
 

@@ -1,4 +1,5 @@
 #pragma once
+#include <optional>
 #include <regex>
 #include <string>
 #include <vector>
@@ -49,9 +50,11 @@ private:
 
 class ConcreteRouter final : public Router {
 public:
-  ConcreteRouter(HttpRouteMapping& httpMapping, WebsocketRouteMapping& websocketMapping, TcpSender& sender)
-      : httpAggregation{httpMapping, sender, *this},
-        websocketAggregation{websocketMapping, sender, *this},
+  ConcreteRouter(HttpRouteMapping& httpMapping, WebsocketRouteMapping& websocketMapping, TcpSender& tcpSender)
+      : tcpSender{tcpSender},
+        httpMapping{httpMapping},
+        websocketMapping{websocketMapping},
+        httpAggregation{tcpSender, *this},
         protocolProcessorDelegate{&httpAggregation.httpLayer} {
   }
 
@@ -64,10 +67,9 @@ public:
 
 private:
   struct HttpAggregation {
-    HttpAggregation(HttpRouteMapping& httpMapping, TcpSender& tcpSender, HttpProcessor& httpProcessor)
-        : httpMapping{httpMapping}, httpSender{tcpSender}, httpLayer{httpParser, httpSender, httpProcessor} {
+    HttpAggregation(TcpSender& tcpSender, HttpProcessor& httpProcessor)
+        : httpSender{tcpSender}, httpLayer{httpParser, httpSender, httpProcessor} {
     }
-    HttpRouteMapping& httpMapping;
     ConcreteHttpSender httpSender;
     ConcreteHttpParser httpParser;
     HttpLayer httpLayer;
@@ -75,13 +77,9 @@ private:
   };
 
   struct WebsocketAggregation {
-    WebsocketAggregation(
-        WebsocketRouteMapping& websocketMapping, TcpSender& tcpSender, WebsocketProcessor& websocketProcessor)
-        : websocketMapping{websocketMapping},
-          websocketSender{tcpSender},
-          websocketLayer{websocketParser, websocketSender, websocketProcessor} {
+    WebsocketAggregation(TcpSender& tcpSender, WebsocketProcessor& websocketProcessor)
+        : websocketSender{tcpSender}, websocketLayer{websocketParser, websocketSender, websocketProcessor} {
     }
-    WebsocketRouteMapping& websocketMapping;
     ConcreteWebsocketSender websocketSender;
     ConcreteWebsocketParser websocketParser;
     WebsocketLayer websocketLayer;
@@ -90,8 +88,11 @@ private:
 
   bool TryUpgradeToWebsocket(const HttpRequest& req);
 
+  TcpSender& tcpSender;
+  HttpRouteMapping& httpMapping;
+  WebsocketRouteMapping& websocketMapping;
   HttpAggregation httpAggregation;
-  WebsocketAggregation websocketAggregation;
+  std::optional<WebsocketAggregation> websocketAggregation{std::nullopt};
   ProtocolProcessor* protocolProcessorDelegate;
 };
 

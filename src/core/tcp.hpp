@@ -91,7 +91,7 @@ private:
 
 class TcpLayer : public TcpSenderSupervisor {
 public:
-  explicit TcpLayer(std::unique_ptr<TcpProcessorFactory>);
+  explicit TcpLayer(TcpProcessorFactory&);
   TcpLayer(const TcpLayer&) = delete;
   TcpLayer(TcpLayer&&) = delete;
   TcpLayer& operator=(const TcpLayer&) = delete;
@@ -115,7 +115,7 @@ private:
   void SendToPeer(int) const;
   void MarkReceiverPending(int) const;
 
-  std::unique_ptr<TcpProcessorFactory> processorFactory;
+  TcpProcessorFactory& processorFactory;
   int localDescriptor{-1};
   int epollDescriptor{-1};
   std::unordered_map<int, TcpConnectionContext> connections;
@@ -123,7 +123,7 @@ private:
 
 class Tcp4Layer final : public TcpLayer {
 public:
-  Tcp4Layer(std::string_view, std::uint16_t, std::unique_ptr<TcpProcessorFactory>);
+  Tcp4Layer(std::string_view, std::uint16_t, TcpProcessorFactory&);
 
 protected:
   int CreateSocket() const override;

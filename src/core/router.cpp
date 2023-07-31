@@ -3,7 +3,7 @@
 namespace network {
 
 bool ConcreteRouter::TryUpgradeToWebsocket(const HttpRequest& req) {
-  auto* entry = websocketAggregation.websocketMapping.Get(req.uri);
+  auto* entry = websocketMapping.Get(req.uri);
   if (not entry) {
     return false;
   }
@@ -14,8 +14,9 @@ bool ConcreteRouter::TryUpgradeToWebsocket(const HttpRequest& req) {
   }
   httpAggregation.httpSender.Send(std::move(*resp));
   httpAggregation.httpProcessor.reset();
-  websocketAggregation.websocketProcessor = entry->Create(websocketAggregation.websocketSender);
-  protocolProcessorDelegate = &websocketAggregation.websocketLayer;
+  websocketAggregation.emplace(tcpSender, *this);
+  websocketAggregation->websocketProcessor = entry->Create(websocketAggregation->websocketSender);
+  protocolProcessorDelegate = &websocketAggregation->websocketLayer;
   return true;
 }
 
@@ -23,9 +24,9 @@ void ConcreteRouter::Process(HttpRequest&& req) {
   if (TryUpgradeToWebsocket(req)) {
     return;
   }
-  auto entry = httpAggregation.httpMapping.Get(req.method, req.uri);
+  auto entry = httpMapping.Get(req.method, req.uri);
   if (entry) {
-    websocketAggregation.websocketProcessor.reset();
+    websocketAggregation.reset();
     httpAggregation.httpProcessor = entry->Create(httpAggregation.httpSender);
     httpAggregation.httpProcessor->Process(std::move(req));
     return;
@@ -36,10 +37,14 @@ void ConcreteRouter::Process(HttpRequest&& req) {
 }
 
 void ConcreteRouter::Process(WebsocketFrame&& req) {
-  if (not websocketAggregation.websocketProcessor) {
-    websocketAggregation.websocketSender.Close();
+  if (not websocketAggregation) {
+    return;
   }
-  websocketAggregation.websocketProcessor->Process(std::move(req));
+  if (not websocketAggregation->websocketProcessor) {
+    websocketAggregation->websocketSender.Close();
+    return;
+  }
+  websocketAggregation->websocketProcessor->Process(std::move(req));
 }
 
 }  // namespace network
