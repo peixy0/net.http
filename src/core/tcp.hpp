@@ -21,7 +21,7 @@ public:
   std::string Buffer() const;
 
 private:
-  int peer;
+  int fd;
   std::string buffer;
   size_t size{0};
 };
@@ -38,7 +38,7 @@ public:
   bool Done() const;
 
 private:
-  int peer;
+  int fd;
   os::File file;
   size_t size{0};
 };
@@ -64,27 +64,14 @@ private:
   void MarkPending();
   void UnmarkPending();
 
-  int peer;
+  int fd;
   TcpSenderSupervisor& supervisor;
   std::deque<TcpSendOperation> buffered;
   bool pending{false};
   std::mutex senderMut;
 };
 
-class TcpConnectionContext {
-public:
-  TcpConnectionContext(int, std::unique_ptr<TcpProcessor>, std::unique_ptr<TcpSender>);
-  TcpConnectionContext(const TcpConnectionContext&) = delete;
-  TcpConnectionContext(TcpConnectionContext&&) = delete;
-  TcpConnectionContext& operator=(const TcpConnectionContext&) = delete;
-  TcpConnectionContext& operator=(TcpConnectionContext&&) = delete;
-  ~TcpConnectionContext();
-
-  TcpProcessor& GetProcessor() const;
-  TcpSender& GetSender() const;
-
-private:
-  int fd;
+struct TcpConnectionContext {
   std::unique_ptr<TcpProcessor> processor;
   std::unique_ptr<TcpSender> sender;
 };
@@ -116,8 +103,8 @@ private:
   void MarkReceiverPending(int) const;
 
   TcpProcessorFactory& processorFactory;
-  int localDescriptor{-1};
-  int epollDescriptor{-1};
+  int localFd{-1};
+  int epollFd{-1};
   std::unordered_map<int, TcpConnectionContext> connections;
 };
 

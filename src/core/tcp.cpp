@@ -22,12 +22,12 @@ struct TrySendOperation {
 
 namespace network {
 
-TcpSendBuffer::TcpSendBuffer(int peer, std::string_view buffer) : peer{peer}, buffer{buffer}, size{buffer.size()} {
+TcpSendBuffer::TcpSendBuffer(int fd, std::string_view buffer) : fd{fd}, buffer{buffer}, size{buffer.size()} {
 }
 
 void TcpSendBuffer::Send() {
   while (size > 0) {
-    ssize_t n = send(peer, buffer.c_str(), size, 0);
+    ssize_t n = send(fd, buffer.c_str(), size, 0);
     if (n == -1) {
       if (errno == EAGAIN or errno == EWOULDBLOCK) {
         return;
@@ -51,7 +51,7 @@ std::string TcpSendBuffer::Buffer() const {
   return buffer;
 }
 
-TcpSendFile::TcpSendFile(int peer, os::File file_) : peer{peer}, file{std::move(file_)} {
+TcpSendFile::TcpSendFile(int fd, os::File file_) : fd{fd}, file{std::move(file_)} {
   if (not file.Ok()) {
     size = 0;
     return;
@@ -61,7 +61,7 @@ TcpSendFile::TcpSendFile(int peer, os::File file_) : peer{peer}, file{std::move(
 
 void TcpSendFile::Send() {
   while (size > 0) {
-    ssize_t n = sendfile(peer, file.Fd(), nullptr, size);
+    ssize_t n = sendfile(fd, file.Fd(), nullptr, size);
     if (n < 0) {
       if (errno == EAGAIN or errno == EWOULDBLOCK) {
         return;
@@ -80,9 +80,9 @@ bool TcpSendFile::Done() const {
   return size == 0;
 }
 
-ConcreteTcpSender::ConcreteTcpSender(int s, TcpSenderSupervisor& supervisor) : peer{s}, supervisor{supervisor} {
+ConcreteTcpSender::ConcreteTcpSender(int fd, TcpSenderSupervisor& supervisor) : fd{fd}, supervisor{supervisor} {
   int flag = 0;
-  int r = setsockopt(peer, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof flag);
+  int r = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof flag);
   if (r < 0) {
     spdlog::error("tcp setsockopt(): {}", strerror(errno));
   }
@@ -118,14 +118,14 @@ void ConcreteTcpSender::Send(std::string_view buf) {
     accumulated = std::move(s);
     buffered.pop_back();
   }
-  TcpSendBuffer op{peer, std::move(accumulated)};
+  TcpSendBuffer op{fd, std::move(accumulated)};
   buffered.emplace_back(std::move(op));
   MarkPending();
 }
 
 void ConcreteTcpSender::Send(os::File file) {
   std::lock_guard lock{senderMut};
-  TcpSendFile op{peer, std::move(file)};
+  TcpSendFile op{fd, std::move(file)};
   buffered.emplace_back(std::move(op));
   MarkPending();
 }
@@ -136,9 +136,9 @@ void ConcreteTcpSender::Close() {
 }
 
 void ConcreteTcpSender::CloseImpl() {
-  if (peer != -1) {
-    shutdown(peer, SHUT_RDWR);
-    peer = -1;
+  if (fd != -1) {
+    shutdown(fd, SHUT_RDWR);
+    fd = -1;
   }
 }
 
@@ -147,7 +147,7 @@ void ConcreteTcpSender::MarkPending() {
     return;
   }
   pending = true;
-  supervisor.MarkSenderPending(peer);
+  supervisor.MarkSenderPending(fd);
 }
 
 void ConcreteTcpSender::UnmarkPending() {
@@ -155,54 +155,34 @@ void ConcreteTcpSender::UnmarkPending() {
     return;
   }
   pending = false;
-  supervisor.UnmarkSenderPending(peer);
-}
-
-TcpConnectionContext::TcpConnectionContext(
-    int fd, std::unique_ptr<TcpProcessor> processor, std::unique_ptr<TcpSender> sender)
-    : fd{fd}, processor{std::move(processor)}, sender{std::move(sender)} {
-  spdlog::info("tcp connection established: {}", fd);
-}
-
-TcpConnectionContext::~TcpConnectionContext() {
-  spdlog::info("tcp connection closed: {}", fd);
-  processor.reset();
-  sender.reset();
-}
-
-TcpProcessor& TcpConnectionContext::GetProcessor() const {
-  return *processor;
-}
-
-TcpSender& TcpConnectionContext::GetSender() const {
-  return *sender;
+  supervisor.UnmarkSenderPending(fd);
 }
 
 TcpLayer::TcpLayer(TcpProcessorFactory& processorFactory) : processorFactory{processorFactory} {
 }
 
 TcpLayer::~TcpLayer() {
-  if (localDescriptor != -1) {
-    close(localDescriptor);
-    localDescriptor = -1;
+  if (localFd != -1) {
+    close(localFd);
+    localFd = -1;
   }
-  if (epollDescriptor != -1) {
-    close(epollDescriptor);
-    epollDescriptor = -1;
+  if (epollFd != -1) {
+    close(epollFd);
+    epollFd = -1;
   }
 }
 
 void TcpLayer::Start() {
-  epollDescriptor = epoll_create1(0);
-  if (epollDescriptor < 0) {
+  epollFd = epoll_create1(0);
+  if (epollFd < 0) {
     spdlog::error("tcp epoll_create1(): {}", strerror(errno));
     return;
   }
-  localDescriptor = CreateSocket();
-  if (localDescriptor < 0) {
+  localFd = CreateSocket();
+  if (localFd < 0) {
     return;
   }
-  MarkReceiverPending(localDescriptor);
+  MarkReceiverPending(localFd);
   StartLoop();
 }
 
@@ -210,7 +190,7 @@ void TcpLayer::MarkReceiverPending(int peer) const {
   epoll_event event;
   event.events = EPOLLIN;
   event.data.fd = peer;
-  int r = epoll_ctl(epollDescriptor, EPOLL_CTL_ADD, peer, &event);
+  int r = epoll_ctl(epollFd, EPOLL_CTL_ADD, peer, &event);
   if (r < 0) {
     spdlog::error("tcp epoll_ctl(): {}", strerror(errno));
     return;
@@ -222,7 +202,7 @@ void TcpLayer::MarkSenderPending(int peer) const {
   epoll_event event;
   event.events = EPOLLIN | EPOLLOUT;
   event.data.fd = peer;
-  int r = epoll_ctl(epollDescriptor, EPOLL_CTL_MOD, peer, &event);
+  int r = epoll_ctl(epollFd, EPOLL_CTL_MOD, peer, &event);
   if (r < 0) {
     spdlog::error("tcp epoll_ctl(): {}", strerror(errno));
     return;
@@ -234,20 +214,20 @@ void TcpLayer::UnmarkSenderPending(int peer) const {
   epoll_event event;
   event.events = EPOLLIN;
   event.data.fd = peer;
-  int r = epoll_ctl(epollDescriptor, EPOLL_CTL_MOD, peer, &event);
+  int r = epoll_ctl(epollFd, EPOLL_CTL_MOD, peer, &event);
   if (r < 0) {
     spdlog::error("tcp epoll_ctl(): {}", strerror(errno));
     return;
   }
 }
 
-void TcpLayer::SetNonBlocking(int s) const {
-  int flags = fcntl(s, F_GETFL);
+void TcpLayer::SetNonBlocking(int peer) const {
+  int flags = fcntl(peer, F_GETFL);
   if (flags < 0) {
     spdlog::error("tcp fcntl(): {}", strerror(errno));
     return;
   }
-  flags = fcntl(s, F_SETFL, flags | O_NONBLOCK);
+  flags = fcntl(peer, F_SETFL, flags | O_NONBLOCK);
   if (flags < 0) {
     spdlog::error("tcp fcntl(): {}", strerror(errno));
     return;
@@ -258,9 +238,9 @@ void TcpLayer::StartLoop() {
   constexpr int maxEvents = 32;
   epoll_event events[maxEvents];
   while (true) {
-    int n = epoll_wait(epollDescriptor, events, maxEvents, -1);
+    int n = epoll_wait(epollFd, events, maxEvents, -1);
     for (int i = 0; i < n; i++) {
-      if (events[i].data.fd == localDescriptor) {
+      if (events[i].data.fd == localFd) {
         SetupPeer();
         continue;
       }
@@ -281,7 +261,7 @@ void TcpLayer::StartLoop() {
 }
 
 void TcpLayer::SetupPeer() {
-  int s = Accept(localDescriptor);
+  int s = Accept(localFd);
   if (s < 0) {
     return;
   }
@@ -289,49 +269,48 @@ void TcpLayer::SetupPeer() {
 
   auto sender = std::make_unique<ConcreteTcpSender>(s, *this);
   auto processor = processorFactory.Create(*sender);
-  connections.try_emplace(s, s, std::move(processor), std::move(sender));
+  connections.try_emplace(s, std::move(processor), std::move(sender));
 }
 
-void TcpLayer::ClosePeer(int peerDescriptor) {
-  connections.erase(peerDescriptor);
-  epoll_ctl(epollDescriptor, EPOLL_CTL_DEL, peerDescriptor, nullptr);
-  close(peerDescriptor);
+void TcpLayer::ClosePeer(int peer) {
+  connections.erase(peer);
+  epoll_ctl(epollFd, EPOLL_CTL_DEL, peer, nullptr);
+  close(peer);
 }
 
-void TcpLayer::ReadFromPeer(int peerDescriptor) {
-  auto it = connections.find(peerDescriptor);
+void TcpLayer::ReadFromPeer(int peer) {
+  auto it = connections.find(peer);
   if (it == connections.end()) {
-    spdlog::error("tcp read from unexpected peer: {}", peerDescriptor);
+    spdlog::error("tcp read from unexpected peer: {}", peer);
     return;
   }
   char buf[512];
   size_t size = sizeof buf;
-  ssize_t r = recv(peerDescriptor, buf, size, 0);
+  ssize_t r = recv(peer, buf, size, 0);
   if (r < 0) {
     if (errno == EAGAIN or errno == EWOULDBLOCK) {
       return;
     }
-    ClosePeer(peerDescriptor);
+    ClosePeer(peer);
     return;
   }
   if (r == 0) {
-    ClosePeer(peerDescriptor);
+    ClosePeer(peer);
     return;
   }
   auto& context = std::get<TcpConnectionContext>(*it);
-  auto& processor = context.GetProcessor();
-  processor.Process({buf, buf + r});
+  context.processor->Process({buf, buf + r});
 }
 
-void TcpLayer::SendToPeer(int peerDescriptor) const {
-  auto it = connections.find(peerDescriptor);
+void TcpLayer::SendToPeer(int peer) const {
+  auto it = connections.find(peer);
   if (it == connections.end()) {
-    spdlog::error("tcp send to unexpected peer: {}", peerDescriptor);
+    spdlog::error("tcp send to unexpected peer: {}", peer);
     return;
   }
 
   const auto& context = std::get<TcpConnectionContext>(*it);
-  context.GetSender().SendBuffered();
+  context.sender->SendBuffered();
 }
 
 Tcp4Layer::Tcp4Layer(std::string_view host, std::uint16_t port, TcpProcessorFactory& processorFactory)
