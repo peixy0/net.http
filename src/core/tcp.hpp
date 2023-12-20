@@ -72,6 +72,10 @@ private:
 };
 
 struct TcpConnectionContext {
+  ~TcpConnectionContext() {
+    processor.reset();
+    sender.reset();
+  }
   std::unique_ptr<TcpProcessor> processor;
   std::unique_ptr<TcpSender> sender;
 };
