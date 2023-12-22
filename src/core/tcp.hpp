@@ -18,7 +18,7 @@ public:
   ~TcpSendBuffer() = default;
   void Send();
   bool Done() const;
-  std::string Buffer() const;
+  std::string&& TakeBuffer();
 
 private:
   int fd;

@@ -47,8 +47,8 @@ bool TcpSendBuffer::Done() const {
   return size == 0;
 }
 
-std::string TcpSendBuffer::Buffer() const {
-  return buffer;
+std::string&& TcpSendBuffer::TakeBuffer() {
+  return std::move(buffer);
 }
 
 TcpSendFile::TcpSendFile(int fd, os::File file_) : fd{fd}, file{std::move(file_)} {
@@ -113,7 +113,7 @@ void ConcreteTcpSender::Send(std::string_view buf) {
       break;
     }
     auto& lastWriteBuffer = std::get<TcpSendBuffer>(lastOp);
-    std::string s = lastWriteBuffer.Buffer();
+    std::string s = lastWriteBuffer.TakeBuffer();
     s += accumulated;
     accumulated = std::move(s);
     buffered.pop_back();

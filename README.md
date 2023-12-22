@@ -1,4 +1,4 @@
-# net.system
+# net.http
 Simple HTTP interface written in modern C++
 
 # build
